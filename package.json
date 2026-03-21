@@ -1,7 +1,8 @@
+cat > package.json << 'EOF'
 {
   "name": "dubshorts",
   "version": "1.0.0",
-  "description": "Spanish video dubbing tool v5",
+  "description": "Spanish video dubbing tool",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -17,3 +18,4 @@
     "fluent-ffmpeg": "^2.1.2"
   }
 }
+EOF
