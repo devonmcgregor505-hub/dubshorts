@@ -226,4 +226,3 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 app.listen(PORT, () => {
   console.log('DubShorts running at http://localhost:' + PORT);
 });
-```
