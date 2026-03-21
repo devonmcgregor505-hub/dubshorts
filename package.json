@@ -1,7 +1,7 @@
 {
   "name": "dubshorts",
   "version": "1.0.0",
-  "description": "Spanish video dubbing tool",
+  "description": "Spanish video dubbing tool v2",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
