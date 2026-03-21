@@ -7,6 +7,7 @@ const fs = require('fs');
 const cors = require('cors');
 const path = require('path');
 const { execSync } = require('child_process');
+const ffmpegPath = require('ffmpeg-static');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -95,9 +96,9 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
     console.log('Step 4: Merging with FFmpeg...');
     execSync(
-      `ffmpeg -i "${videoPath}" -i "${audioPath}" -map 0:v -map 1:a -c:v copy -c:a aac -shortest "${outputPath}"`,
-      { stdio: 'inherit' }
-    );
+  `"${ffmpegPath}" -i "${videoPath}" -i "${audioPath}" -map 0:v -map 1:a -c:v copy -c:a aac -shortest "${outputPath}"`,
+  { stdio: 'inherit' }
+);
     console.log('Merge complete!');
 
     const token = Date.now().toString();
