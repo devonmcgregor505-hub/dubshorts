@@ -6,8 +6,10 @@ const FormData = require('form-data');
 const fs = require('fs');
 const cors = require('cors');
 const path = require('path');
-const { execSync } = require('child_process');
-const ffmpegPath = require('ffmpeg-static');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegStatic = require('ffmpeg-static');
+
+ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -95,10 +97,22 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     ).catch(() => {});
 
     console.log('Step 4: Merging with FFmpeg...');
-    execSync(
-  `"${ffmpegPath}" -i "${videoPath}" -i "${audioPath}" -map 0:v -map 1:a -c:v copy -c:a aac -shortest "${outputPath}"`,
-  { stdio: 'inherit' }
-);
+    await new Promise((resolve, reject) => {
+      ffmpeg()
+        .input(videoPath)
+        .input(audioPath)
+        .outputOptions([
+          '-map 0:v',
+          '-map 1:a',
+          '-c:v copy',
+          '-c:a aac',
+          '-shortest'
+        ])
+        .output(outputPath)
+        .on('end', resolve)
+        .on('error', reject)
+        .run();
+    });
     console.log('Merge complete!');
 
     const token = Date.now().toString();
