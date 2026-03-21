@@ -1,4 +1,3 @@
-cat > package.json << 'EOF'
 {
   "name": "dubshorts",
   "version": "1.0.0",
@@ -18,4 +17,3 @@ cat > package.json << 'EOF'
     "fluent-ffmpeg": "^2.1.2"
   }
 }
-EOF
