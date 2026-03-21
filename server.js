@@ -227,11 +227,3 @@ app.listen(PORT, () => {
   console.log('DubShorts running at http://localhost:' + PORT);
 });
 ```
-
-Commit that. Then in your VS Code terminal run:
-```
-git pull
-npm install
-git add .
-git commit -m "add ghostcut and spanish captions"
-git push
