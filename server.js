@@ -126,7 +126,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       if (srtRes.data && srtRes.data.length > 10) {
         fs.writeFileSync(assPath, srtToWordAss(srtRes.data));
         hasAss = HAS_LIBASS;
-        console.log('ASS written, will burn:', hasAss);
+        console.log('ASS written, will burn:', hasAss); console.log('ASS SAMPLE:', fs.readFileSync(assPath, 'utf8').slice(0, 400));
       }
     } catch(e) { console.log('SRT failed:', e.message); }
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
