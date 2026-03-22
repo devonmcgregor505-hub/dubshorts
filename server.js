@@ -33,11 +33,11 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     console.log('Video URL:', videoUrl);
     console.log('Step 2: Removing captions with Replicate...');
     const cleanOutput = await replicate.run('hjunior29/video-text-remover:247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d', { input: { video: videoUrl, method: 'hybrid', conf_threshold: 0.25, margin: 5 } });
-    const cleanVideoUrl = typeof cleanOutput === 'string' ? cleanOutput : cleanOutput[0];
+    const cleanVideoUrl = typeof cleanOutput === 'string' ? cleanOutput : (cleanOutput?.url || cleanOutput?.[0]?.url || cleanOutput?.[0] || videoUrl);
     console.log('Captions removed:', cleanVideoUrl);
     console.log('Step 3: Sending to ElevenLabs...');
     const form = new FormData();
-    form.append('url', cleanVideoUrl);
+    form.append('source_url', cleanVideoUrl);
     form.append('source_lang', 'en');
     form.append('target_lang', 'es');
     form.append('num_speakers', '0');
