@@ -33,8 +33,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
     console.log('Video URL:', videoUrl);
     console.log('Step 2: Removing captions with Replicate...');
-    let fileToSend = videoPath;
-    let filenameToSend = req.file.originalname;
+    let cleanVideoPath = null;
     try {
       const prediction = await replicate.predictions.create({ version: '247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d', input: { video: videoUrl, method: 'hybrid', conf_threshold: 0.25, margin: 5 } });
       console.log('Prediction created:', prediction.id);
@@ -49,20 +48,18 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       if (completed.status === 'succeeded' && completed.output) {
         const output = completed.output;
         let replicateUrl = typeof output === 'string' ? output : (Array.isArray(output) ? String(output[0]) : (output.url || output.video || null));
-        console.log('Replicate URL:', replicateUrl);
         if (replicateUrl) {
-          console.log('Downloading clean video...');
+          console.log('Downloading clean video from:', replicateUrl);
           const dlRes = await axios.get(replicateUrl, { responseType: 'arraybuffer' });
           fs.writeFileSync(cleanPath, dlRes.data);
-          fileToSend = cleanPath;
-          filenameToSend = 'clean_video.mp4';
-          console.log('Clean video saved locally');
+          cleanVideoPath = cleanPath;
+          console.log('Clean video saved (no captions, no audio)');
         }
       }
-    } catch (repErr) { console.error('Replicate error (using original):', repErr.message); }
-    console.log('Step 3: Sending to ElevenLabs...');
+    } catch (repErr) { console.error('Replicate error (skipping):', repErr.message); }
+    console.log('Step 3: Sending ORIGINAL video to ElevenLabs for dubbing...');
     const form = new FormData();
-    form.append('file', fs.createReadStream(fileToSend), { filename: filenameToSend, contentType: 'video/mp4' });
+    form.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: 'video/mp4' });
     form.append('source_lang', 'en');
     form.append('target_lang', 'es');
     form.append('num_speakers', '0');
@@ -84,10 +81,12 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const audioRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/audio/es', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, responseType: 'arraybuffer' });
     fs.writeFileSync(audioPath, audioRes.data);
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
-    console.log('Step 4: Merging with FFmpeg...');
+    const videoSource = cleanVideoPath || videoPath;
+    console.log('Step 4: Merging clean video + Spanish audio...');
     await new Promise((resolve, reject) => {
-      ffmpeg().input(fileToSend).input(audioPath).outputOptions(['-map 0:v', '-map 1:a', '-c:v copy', '-c:a aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
+      ffmpeg().input(videoSource).input(audioPath).outputOptions(['-map 0:v', '-map 1:a', '-c:v copy', '-c:a aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
     });
+    console.log('Done!');
     [videoPath, cleanPath, audioPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
     const token = Date.now().toString();
     app.get('/download/' + token, (req, res) => { res.download(outputPath, 'spanish_dubbed.mp4', () => { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); }); });
