@@ -10,12 +10,21 @@ const { spawnSync } = require('child_process');
 const ffmpegStatic = require('ffmpeg-static');
 const { createCanvas, loadImage, registerFont } = require('canvas');
 
-const fontPath = path.join(__dirname, 'DejaVuSans-Bold.ttf');
-if (fs.existsSync(fontPath)) {
-  registerFont(fontPath, { family: 'CaptionFont', weight: 'bold' });
-  console.log('Font registered:', fontPath);
-} else {
-  console.log('WARNING: Font file not found at', fontPath);
+// Register all fonts
+const fonts = [
+  { file: 'DejaVuSans-Bold.ttf', family: 'DejaVu', weight: 'bold' },
+  { file: 'Poppins-Bold.ttf', family: 'Poppins', weight: 'bold' },
+  { file: 'BebasNeue.ttf', family: 'BebasNeue', weight: 'normal' },
+  { file: 'Montserrat-Bold.ttf', family: 'Montserrat', weight: 'bold' },
+];
+for (const f of fonts) {
+  const fp = path.join(__dirname, f.file);
+  if (fs.existsSync(fp)) {
+    registerFont(fp, { family: f.family, weight: f.weight });
+    console.log('Font registered:', f.family);
+  } else {
+    console.log('Font missing:', f.file);
+  }
 }
 
 let FFMPEG_PATH = ffmpegStatic;
@@ -70,20 +79,21 @@ function parseSrtToCues(srtContent) {
 async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
   style = style || {};
   const fontSize = Math.round(vidH * ((style.fontSize || 5) / 100));
-  const fontFamily = fs.existsSync(fontPath) ? 'CaptionFont' : 'sans-serif';
+  const fontFamily = style.fontFamily || 'DejaVu';
   const textColor = style.textColor || '#ffffff';
   const outlineColor = style.outlineColor || '#000000';
-  const outlineWidth = fontSize * ((style.outlineWidth || 15) / 100);
+  const outlineWidth = Math.max(1, fontSize * ((style.outlineWidth || 15) / 100));
   const yPos = style.yPos || 0.78;
   const textCase = style.textCase || 'upper';
 
   const frames = fs.readdirSync(framesDir).filter(f => f.endsWith('.jpg')).sort();
-  console.log(`Burning captions: ${frames.length} frames, ${fontSize}px, yPos=${yPos}`);
+  console.log(`Burning captions: ${frames.length} frames, ${fontSize}px ${fontFamily}, yPos=${yPos}`);
 
   for (let i = 0; i < frames.length; i++) {
     const t = i / fps;
     const cue = cues.find(c => t >= c.start && t < c.end);
     if (!cue) continue;
+
     const framePath = path.join(framesDir, frames[i]);
     const img = await loadImage(framePath);
     const canvas = createCanvas(vidW, vidH);
@@ -94,18 +104,16 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
     if (textCase === 'upper') text = text.toUpperCase();
     else if (textCase === 'lower') text = text.toLowerCase();
 
-    ctx.font = `bold ${fontSize}px ${fontFamily}`;
+    ctx.font = `bold ${fontSize}px "${fontFamily}"`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     const x = vidW / 2;
     const y = vidH * yPos;
 
-    // Outline
     ctx.lineWidth = outlineWidth;
     ctx.strokeStyle = outlineColor;
     ctx.lineJoin = 'round';
     ctx.strokeText(text, x, y);
-    // Fill
     ctx.fillStyle = textColor;
     ctx.fillText(text, x, y);
 
@@ -188,12 +196,12 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     }
 
     if (cues.length > 0) {
-      console.log('Extracting frames for caption burning...');
+      console.log('Extracting frames...');
       fs.mkdirSync(framesDir, { recursive: true });
       runFFmpeg(['-y','-i',videoForMerge,'-vf',`fps=${fps}`,'-q:v','2',path.join(framesDir,'frame%06d.jpg')], 300000);
-      console.log('Burning captions on frames...');
+      console.log('Burning captions...');
       await burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, captionStyle);
-      console.log('Reassembling video...');
+      console.log('Reassembling...');
       runFFmpeg(['-y','-framerate',String(fps),'-i',path.join(framesDir,'frame%06d.jpg'),'-c:v','libx264','-preset','ultrafast','-crf','28','-pix_fmt','yuv420p','-threads','1',captionedPath], 300000);
       try { fs.readdirSync(framesDir).forEach(f=>fs.unlinkSync(path.join(framesDir,f))); fs.rmdirSync(framesDir); } catch(e) {}
       videoForMerge = captionedPath;
