@@ -47,9 +47,26 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const audioRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/audio/es', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, responseType: 'arraybuffer' });
     fs.writeFileSync(audioPath, audioRes.data);
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
-    console.log('Step 2: Merging video + Spanish audio...');
+    console.log('Step 2: Merging + blurring captions...');
     await new Promise((resolve, reject) => {
-      ffmpeg(videoPath).input(audioPath).outputOptions(['-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
+      ffmpeg(videoPath)
+        .input(audioPath)
+        .outputOptions([
+          '-filter_complex',
+          '[0:v]split[original][forblur];[forblur]crop=iw:ih*0.25:0:ih*0.68,gblur=sigma=20[blurred];[original][blurred]overlay=0:H*0.68[v]',
+          '-map', '[v]',
+          '-map', '1:a',
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-c:a', 'aac',
+          '-shortest',
+          '-threads', '2'
+        ])
+        .output(outputPath)
+        .on('end', resolve)
+        .on('error', reject)
+        .run();
     });
     console.log('Done!');
     [videoPath, audioPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
