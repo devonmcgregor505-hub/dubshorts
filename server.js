@@ -6,6 +6,7 @@ const FormData = require('form-data');
 const fs = require('fs');
 const cors = require('cors');
 const path = require('path');
+const { execSync } = require('child_process');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegStatic = require('ffmpeg-static');
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -22,47 +23,34 @@ function srtTimeToSeconds(t) {
   const [s,ms] = rest.split(',');
   return parseInt(h)*3600 + parseInt(m)*60 + parseInt(s) + parseInt(ms)/1000;
 }
-function toAssTime(seconds) {
-  const h = Math.floor(seconds/3600);
-  const m = Math.floor((seconds%3600)/60);
-  const s = Math.floor(seconds%60);
-  const cs = Math.floor((seconds%1)*100);
-  return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
-}
-function srtToWordAss(srtContent) {
-  const header = `[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,55,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,3,0,2,10,10,80,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
+
+function srtToDrawtext(srtContent) {
   const blocks = srtContent.trim().split(/\n\n+/);
-  let events = '';
+  const filters = [];
   for (const block of blocks) {
     const lines = block.trim().split('\n');
     if (lines.length < 3) continue;
     const timeLine = lines[1];
-    const textLine = lines.slice(2).join(' ').replace(/<[^>]+>/g, '').trim();
     if (!timeLine.includes('-->')) continue;
     const [startStr, endStr] = timeLine.split('-->').map(t => t.trim());
     const startSec = srtTimeToSeconds(startStr);
     const endSec = srtTimeToSeconds(endStr);
-    const words = textLine.split(/\s+/).filter(w => w.length > 0);
-    if (words.length === 0) continue;
-    const wordDuration = (endSec - startSec) / words.length;
-    for (let i = 0; i < words.length; i++) {
-      const wStart = startSec + i * wordDuration;
-      const wEnd = startSec + (i + 1) * wordDuration;
-      events += `Dialogue: 0,${toAssTime(wStart)},${toAssTime(wEnd)},Default,,0,0,0,,${words[i]}\n`;
-    }
+    const textLine = lines.slice(2).join(' ').replace(/<[^>]+>/g, '').trim();
+    if (!textLine) continue;
+    // Escape special chars for drawtext
+    const escaped = textLine.replace(/'/g, "\u2019").replace(/:/g, '\\:').replace(/\\/g, '/').replace(/[,%]/g, '');
+    filters.push(`drawtext=text='${escaped}':fontsize=55:fontcolor=white:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.75:enable='between(t,${startSec.toFixed(3)},${endSec.toFixed(3)})'`);
   }
-  return header + events;
+  return filters.join(',');
 }
 
 app.post('/translate', upload.single('video'), async (req, res) => {
   const videoPath = req.file.path;
   const timestamp = Date.now();
   const audioPath = 'uploads/spanish_' + timestamp + '.mp3';
-  const srtPath = 'uploads/spanish_' + timestamp + '.srt';
-  const assPath = '/tmp/subs_' + timestamp + '.ass';
   const blurredPath = 'uploads/blurred_' + timestamp + '.mp4';
   const outputPath = 'uploads/final_' + timestamp + '.mp4';
-  const allFiles = [videoPath, audioPath, srtPath, assPath, blurredPath];
+  const allFiles = [videoPath, audioPath, blurredPath];
   console.log('File received:', req.file.originalname);
   let captionBox = null;
   if (req.body.captionBox) {
@@ -93,15 +81,12 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const audioRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/audio/es', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, responseType: 'arraybuffer' });
     fs.writeFileSync(audioPath, audioRes.data);
     console.log('Fetching Spanish SRT...');
-    let hasAss = false;
+    let drawtextFilter = '';
     try {
       const srtRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/transcript/es?format_type=srt', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } });
       if (srtRes.data && srtRes.data.length > 10) {
-        fs.writeFileSync(srtPath, srtRes.data);
-        const assContent = srtToWordAss(srtRes.data);
-        fs.writeFileSync(assPath, assContent);
-        hasAss = true;
-        console.log('ASS saved to /tmp, words:', assContent.split('Dialogue').length - 1);
+        drawtextFilter = srtToDrawtext(srtRes.data);
+        console.log('Drawtext filter built, segments:', drawtextFilter.split('drawtext').length - 1);
       }
     } catch(e) { console.log('SRT fetch failed:', e.message); }
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
@@ -115,13 +100,12 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       console.log('Blur done!');
     }
     const sourceVideo = captionBox ? blurredPath : videoPath;
-    console.log('Step 2: Merging + burning subtitles...');
+    console.log('Step 2: Merging + burning captions...');
     await new Promise((resolve, reject) => {
       let cmd = ffmpeg(sourceVideo).input(audioPath);
       const outputOpts = [];
-      if (hasAss) {
-        console.log('Burning ASS from path:', assPath);
-        outputOpts.push('-vf', `ass=${assPath}`);
+      if (drawtextFilter) {
+        outputOpts.push('-vf', drawtextFilter);
         outputOpts.push('-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28');
       } else {
         outputOpts.push('-c:v', 'copy');
