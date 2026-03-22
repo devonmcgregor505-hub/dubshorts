@@ -115,10 +115,13 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       videoForMerge=blurredPath;console.log('Blur done!');
     }
     if(hasAss){
-      console.log('Burning subtitles...');
-      runFFmpeg(['-y','-i',videoForMerge,'-vf',`ass=${assPath}`,'-c:v','libx264','-preset','ultrafast','-crf','28','-threads','2',subtitledPath]);
-      videoForMerge=subtitledPath;console.log('Subtitles burned!');
+      console.log("Burning captions with Python...");
+      const pyResult = spawnSync("python3", ["burn_captions.py", videoForMerge, assPath, subtitledPath, FFMPEG_PATH], { timeout: 300000, maxBuffer: 100*1024*1024, encoding: "utf8" });
+      console.log("Python output:", pyResult.stdout);
+      if(pyResult.status === 0 && fs.existsSync(subtitledPath)) { videoForMerge = subtitledPath; console.log("Captions burned!"); }
+      else { console.log("Python failed:", pyResult.stderr); }
     }
+
     console.log('Final merge...');
     runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','copy','-c:a','aac','-shortest',outputPath]);
     console.log('Done!');

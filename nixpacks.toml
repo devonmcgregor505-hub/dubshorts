@@ -1,2 +1,2 @@
 [phases.setup]
-nixPkgs = ["ffmpeg", "liberation_ttf"]
+nixPkgs = ["ffmpeg", "python3", "python312Packages.pillow"]
