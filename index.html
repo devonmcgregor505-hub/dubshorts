@@ -234,7 +234,7 @@ async function startTranslation(){
     if(!data.success){hide('statusProcessing');show('statusError');document.getElementById('errorMsg').textContent=data.error;document.getElementById('translateBtn').disabled=false;return;}
     
     if(data.srt && data.srt.length > 10){
-      setStep(5);
+      setStep(5); document.getElementById("step5").innerHTML = "<div class=\"step-dot\"></div> Adding Spanish captions... <span id=\"capProg\">0%</span>";
       console.log('Burning captions in browser...');
       const finalUrl = await burnCaptionsInBrowser(data.downloadUrl, data.srt);
       hide('statusProcessing');show('statusDone');
