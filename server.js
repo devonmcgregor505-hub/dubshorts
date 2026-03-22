@@ -153,41 +153,58 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       console.log('Video:', vidW, 'x', vidH, '@', fps, 'fps');
     } catch(e) {}
 
-    console.log('Step 1: Sending to ElevenLabs...');
-    const form = new FormData();
-    form.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: 'video/mp4' });
-    form.append('source_lang','en'); form.append('target_lang','es');
-    form.append('num_speakers','0'); form.append('watermark','false');
-    const startRes = await axios.post('https://api.elevenlabs.io/v1/dubbing', form, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY, ...form.getHeaders() }, timeout: 600000 });
-    const dubbingId = startRes.data.dubbing_id;
-    console.log('Dubbing started:', dubbingId);
-    let status='dubbing', attempts=0;
-    while (status==='dubbing' && attempts<30) {
-      await new Promise(r=>setTimeout(r,10000)); attempts++;
-      const checkRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/'+dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } });
-      status=checkRes.data.status;
-      console.log('ElevenLabs check '+attempts+': '+status);
-    }
-    if (status!=='dubbed') throw new Error('Dubbing failed: '+status);
-    console.log('Dubbing complete!');
+    console.log('Step 1: Uploading to temp storage...');
+    const uploadForm = new FormData();
+    uploadForm.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
+    const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
+    const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+    console.log('Video URL:', videoUrl);
 
-    const audioRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/'+dubbingId+'/audio/es', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, responseType: 'arraybuffer' });
-    fs.writeFileSync(audioPath, audioRes.data);
+    console.log('Step 2: Sending to ModelsLab dubbing...');
+    const dubRes = await axios.post('https://modelslab.com/api/v6/voice/create_dubbing', {
+      key: process.env.MODELSLAB_API_KEY,
+      init_video: videoUrl,
+      source_lang: 'en',
+      output_lang: 'es',
+      voice_model: 'kokoro',
+      speed: 1.0,
+      file_prefix: 'dubbed_'+Date.now(),
+      base64: false,
+      webhook: null,
+      track_id: null
+    }, { headers: { 'Content-Type': 'application/json' }, timeout: 30000 });
+
+    console.log('ModelsLab response:', JSON.stringify(dubRes.data).slice(0, 200));
+
+    let dubbedVideoUrl = null;
+    if (dubRes.data.status === 'success' && dubRes.data.output && dubRes.data.output[0]) {
+      dubbedVideoUrl = dubRes.data.output[0];
+      console.log('Dubbing complete immediately!');
+    } else if (dubRes.data.status === 'processing' && dubRes.data.fetch_result) {
+      console.log('Processing, polling for result...');
+      let attempts = 0;
+      while (attempts < 60) {
+        await new Promise(r => setTimeout(r, 5000));
+        attempts++;
+        const pollRes = await axios.post(dubRes.data.fetch_result, { key: process.env.MODELSLAB_API_KEY }, { headers: { 'Content-Type': 'application/json' } });
+        console.log('Poll '+attempts+': '+pollRes.data.status);
+        if (pollRes.data.status === 'success' && pollRes.data.output && pollRes.data.output[0]) {
+          dubbedVideoUrl = pollRes.data.output[0];
+          console.log('Dubbing complete!');
+          break;
+        }
+      }
+    }
+
+    if (!dubbedVideoUrl) throw new Error('ModelsLab dubbing failed or timed out');
+
+    console.log('Downloading dubbed video...');
+    const dubbedRes = await axios.get(dubbedVideoUrl, { responseType: 'arraybuffer', timeout: 120000 });
+    fs.writeFileSync(audioPath, dubbedRes.data); // reuse audioPath as temp dubbed video
 
     let cues = [];
-    if (captionStyle && captionStyle.enabled) {
-      try {
-        const srtRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/'+dubbingId+'/transcript/es?format_type=srt', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } });
-        if (srtRes.data && srtRes.data.length>10) {
-          cues = parseSrtToCues(srtRes.data);
-          console.log('Got', cues.length, 'word cues');
-        }
-      } catch(e) { console.log('SRT failed:', e.message); }
-    }
 
-    await axios.delete('https://api.elevenlabs.io/v1/dubbing/'+dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(()=>{});
-
-    let videoForMerge = videoPath;
+    let videoForMerge = audioPath; // audioPath now holds the complete dubbed video from ModelsLab
 
     if (captionBox) {
       console.log('Blurring...');
@@ -212,7 +229,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     }
 
     console.log('Final merge...');
-    runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','copy','-c:a','aac','-shortest',outputPath]);
+    // ModelsLab returns complete dubbed video - just copy it to output
+    runFFmpeg(['-y','-i',videoForMerge,'-c:v','copy','-c:a','copy',outputPath]);
     console.log('Done!');
     allFiles.forEach(f=>{try{if(fs.existsSync(f))fs.unlinkSync(f);}catch(e){}});
     setTimeout(()=>{try{if(fs.existsSync(outputPath))fs.unlinkSync(outputPath);}catch(e){}}, 600000);
