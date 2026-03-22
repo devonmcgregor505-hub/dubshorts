@@ -17,13 +17,13 @@ const fonts = [
   { file: 'BebasNeue.ttf', family: 'BebasNeue', weight: 'normal' },
   { file: 'Montserrat-Bold.ttf', family: 'Montserrat', weight: 'bold' },
 ];
-for (const f of fonts) {
+for (const f of fonts) { try {
   const fp = path.join(__dirname, f.file);
   if (fs.existsSync(fp)) {
     registerFont(fp, { family: f.family, weight: f.weight });
     console.log('Font registered:', f.family);
   } else {
-    console.log('Font missing:', f.file);
+    console.log('Font missing:', f.file); } catch(e) { console.log('Font parse error:', f.family, e.message); }
   }
 }
 
