@@ -167,6 +167,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       source_lang: 'en',
       output_lang: 'es',
       voice_model: 'kokoro',
+      voice_id: 'valentina',
       speed: 1.0,
       file_prefix: 'dubbed_'+Date.now(),
       base64: false,
