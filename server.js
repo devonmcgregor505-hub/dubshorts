@@ -67,11 +67,19 @@ function parseSrtToCues(srtContent) {
   return cues;
 }
 
-async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps) {
-  const frames = fs.readdirSync(framesDir).filter(f => f.endsWith('.jpg')).sort();
-  const fontSize = Math.round(vidH * 0.05);
+async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
+  style = style || {};
+  const fontSize = Math.round(vidH * ((style.fontSize || 5) / 100));
   const fontFamily = fs.existsSync(fontPath) ? 'CaptionFont' : 'sans-serif';
-  console.log(`Burning captions: ${frames.length} frames, ${fontSize}px ${fontFamily}`);
+  const textColor = style.textColor || '#ffffff';
+  const outlineColor = style.outlineColor || '#000000';
+  const outlineWidth = fontSize * ((style.outlineWidth || 15) / 100);
+  const yPos = style.yPos || 0.78;
+  const textCase = style.textCase || 'upper';
+
+  const frames = fs.readdirSync(framesDir).filter(f => f.endsWith('.jpg')).sort();
+  console.log(`Burning captions: ${frames.length} frames, ${fontSize}px, yPos=${yPos}`);
+
   for (let i = 0; i < frames.length; i++) {
     const t = i / fps;
     const cue = cues.find(c => t >= c.start && t < c.end);
@@ -81,20 +89,28 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps) {
     const canvas = createCanvas(vidW, vidH);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0, vidW, vidH);
+
+    let text = cue.text;
+    if (textCase === 'upper') text = text.toUpperCase();
+    else if (textCase === 'lower') text = text.toLowerCase();
+
     ctx.font = `bold ${fontSize}px ${fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     const x = vidW / 2;
-    const y = vidH * 0.82;
-    const text = cue.text.toUpperCase();
-    ctx.lineWidth = fontSize * 0.15;
-    ctx.strokeStyle = 'black';
+    const y = vidH * yPos;
+
+    // Outline
+    ctx.lineWidth = outlineWidth;
+    ctx.strokeStyle = outlineColor;
     ctx.lineJoin = 'round';
     ctx.strokeText(text, x, y);
-    ctx.fillStyle = 'white';
+    // Fill
+    ctx.fillStyle = textColor;
     ctx.fillText(text, x, y);
+
     fs.writeFileSync(framePath, canvas.toBuffer('image/jpeg', { quality: 0.92 }));
-    if (i % 30 === 0) console.log(`Captioned ${i}/${frames.length}`);
+    if (i % 50 === 0) console.log(`Captioned ${i}/${frames.length}`);
   }
   console.log('All frames captioned!');
 }
@@ -109,8 +125,12 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   const outputPath = path.resolve('outputs/final_'+timestamp+'.mp4');
   const allFiles = [videoPath, audioPath, blurredPath, captionedPath];
   console.log('File received:', req.file.originalname);
+
   let captionBox = null;
+  let captionStyle = null;
   if (req.body.captionBox) { try { captionBox = JSON.parse(req.body.captionBox); } catch(e) {} }
+  if (req.body.captionStyle) { try { captionStyle = JSON.parse(req.body.captionStyle); } catch(e) {} }
+
   try {
     let vidW=1080, vidH=1920, fps=30;
     try {
@@ -118,9 +138,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       const dim = (probe.stderr||'').match(/(\d{3,4})x(\d{3,4})/);
       const fpsM = (probe.stderr||'').match(/(\d+(?:\.\d+)?) fps/);
       if (dim) { vidW=parseInt(dim[1]); vidH=parseInt(dim[2]); }
-      if (fpsM) fps=Math.min(parseFloat(fpsM[1]), 24);
+      if (fpsM) fps = Math.min(parseFloat(fpsM[1]), 24);
       console.log('Video:', vidW, 'x', vidH, '@', fps, 'fps');
     } catch(e) {}
+
     console.log('Step 1: Sending to ElevenLabs...');
     const form = new FormData();
     form.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: 'video/mp4' });
@@ -138,44 +159,55 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     }
     if (status!=='dubbed') throw new Error('Dubbing failed: '+status);
     console.log('Dubbing complete!');
+
     const audioRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/'+dubbingId+'/audio/es', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, responseType: 'arraybuffer' });
     fs.writeFileSync(audioPath, audioRes.data);
+
     let cues = [];
-    try {
-      const srtRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/'+dubbingId+'/transcript/es?format_type=srt', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } });
-      if (srtRes.data && srtRes.data.length>10) {
-        cues = parseSrtToCues(srtRes.data);
-        console.log('Got', cues.length, 'word cues');
-      }
-    } catch(e) { console.log('SRT failed:', e.message); }
+    if (captionStyle && captionStyle.addCaptions) {
+      try {
+        const srtRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/'+dubbingId+'/transcript/es?format_type=srt', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } });
+        if (srtRes.data && srtRes.data.length > 10) {
+          cues = parseSrtToCues(srtRes.data);
+          console.log('Got', cues.length, 'word cues');
+        }
+      } catch(e) { console.log('SRT failed:', e.message); }
+    }
+
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/'+dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(()=>{});
+
     let videoForMerge = videoPath;
+
     if (captionBox) {
-      console.log('Blurring...');
+      console.log('Blurring caption region...');
       const {x,y,w,h} = captionBox;
       const blurFilter = `[0:v]split[original][forblur];[forblur]crop=iw*${w.toFixed(4)}:ih*${h.toFixed(4)}:iw*${x.toFixed(4)}:ih*${y.toFixed(4)},gblur=sigma=25[blurred];[original][blurred]overlay=W*${x.toFixed(4)}:H*${y.toFixed(4)}[v]`;
       runFFmpeg(['-y','-i',videoPath,'-filter_complex',blurFilter,'-map','[v]','-map','0:a?','-c:v','libx264','-preset','ultrafast','-crf','28','-threads','2',blurredPath]);
       videoForMerge = blurredPath;
       console.log('Blur done!');
     }
+
     if (cues.length > 0) {
-      console.log('Extracting frames...');
+      console.log('Extracting frames for caption burning...');
       fs.mkdirSync(framesDir, { recursive: true });
       runFFmpeg(['-y','-i',videoForMerge,'-vf',`fps=${fps}`,'-q:v','2',path.join(framesDir,'frame%06d.jpg')], 300000);
-      console.log('Burning captions...');
-      await burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps);
-      console.log('Reassembling...');
+      console.log('Burning captions on frames...');
+      await burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, captionStyle);
+      console.log('Reassembling video...');
       runFFmpeg(['-y','-framerate',String(fps),'-i',path.join(framesDir,'frame%06d.jpg'),'-c:v','libx264','-preset','ultrafast','-crf','28','-pix_fmt','yuv420p','-threads','1',captionedPath], 300000);
       try { fs.readdirSync(framesDir).forEach(f=>fs.unlinkSync(path.join(framesDir,f))); fs.rmdirSync(framesDir); } catch(e) {}
       videoForMerge = captionedPath;
       console.log('Captions burned!');
     }
+
     console.log('Final merge...');
     runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','copy','-c:a','aac','-shortest',outputPath]);
     console.log('Done!');
+
     allFiles.forEach(f=>{try{if(fs.existsSync(f))fs.unlinkSync(f);}catch(e){}});
     setTimeout(()=>{try{if(fs.existsSync(outputPath))fs.unlinkSync(outputPath);}catch(e){}}, 600000);
     res.json({ success: true, videoUrl: '/outputs/final_'+timestamp+'.mp4' });
+
   } catch(err) {
     console.error('Error:', err.message);
     if (err.response) console.error('API error:', JSON.stringify(err.response.data));
@@ -184,4 +216,5 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 app.listen(PORT, ()=>{ console.log('DubShorts running at http://localhost:'+PORT); });

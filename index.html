@@ -18,24 +18,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .upload-hint{font-size:12px;color:#444}
 .file-chosen{font-size:13px;color:#ff4500;margin-top:10px;font-weight:500}
 input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.caption-section{margin-bottom:16px;background:#0d0d0d;border:1px solid #1e1e1e;border-radius:14px;padding:16px}
-.caption-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.caption-label{font-size:14px;font-weight:600;color:#ccc}
-.caption-toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:#555}
+.section{margin-bottom:16px;background:#0d0d0d;border:1px solid #1e1e1e;border-radius:14px;padding:16px}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.section-label{font-size:14px;font-weight:600;color:#ccc}
 .toggle-switch{position:relative;width:36px;height:20px;cursor:pointer}
 .toggle-switch input{opacity:0;width:0;height:0}
 .toggle-slider{position:absolute;inset:0;background:#222;border-radius:20px;transition:0.2s}
 .toggle-slider:before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:#555;border-radius:50%;transition:0.2s}
 .toggle-switch input:checked + .toggle-slider{background:#ff4500}
 .toggle-switch input:checked + .toggle-slider:before{transform:translateX(16px);background:#fff}
-.caption-hint{font-size:12px;color:#444;margin-bottom:12px}
+.section-hint{font-size:12px;color:#444;margin-bottom:12px}
 .video-preview-wrap{position:relative;display:none;border-radius:10px;overflow:hidden;background:#000;cursor:crosshair;user-select:none}
 .video-preview-wrap.visible{display:block}
 #previewVideo{width:100%;display:block;pointer-events:none}
 #selectionCanvas{position:absolute;top:0;left:0;width:100%;height:100%}
 .caption-actions{display:flex;gap:8px;margin-top:10px;align-items:center}
 .caption-btn{padding:8px 14px;border:1px solid #ff4500;background:transparent;color:#ff4500;border-radius:8px;font-size:12px;cursor:pointer}
-.btn{width:100%;padding:16px;background:#ff4500;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:all 0.2s}
+.style-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px}
+.style-item{display:flex;flex-direction:column;gap:6px}
+.style-item label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.5px}
+.style-item select,.style-item input[type="range"]{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#ccc;padding:6px 8px;font-size:12px;width:100%}
+.style-item input[type="color"]{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;width:100%;height:34px;cursor:pointer;padding:2px}
+.range-val{font-size:11px;color:#555;text-align:right}
+.style-full{grid-column:1/-1}
+.btn{width:100%;padding:16px;background:#ff4500;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:all 0.2s;margin-top:4px}
 .btn:hover{background:#e03d00}.btn:disabled{background:#1e1e1e;color:#444;cursor:not-allowed}
 .status{margin-top:20px;border-radius:12px;padding:18px 20px;font-size:14px;display:none}
 .status-processing{background:#111500;border:1px solid #2a2a00}
@@ -61,18 +67,15 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
     <div class="upload-hint">MP4 or MOV · Max 200MB</div>
     <div class="file-chosen" id="fileName"></div>
   </div>
-  <div class="caption-section" id="captionSection" style="display:none">
-    <div class="caption-header">
-      <div class="caption-label">🔤 Remove Captions?</div>
-      <div class="caption-toggle">
-        <span>Enable</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="captionToggle" onchange="toggleCaptionSelector()">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
+  <div class="section" id="captionSection" style="display:none">
+    <div class="section-header">
+      <div class="section-label">🔤 Remove English Captions?</div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="captionToggle" onchange="toggleCaptionSelector()">
+        <span class="toggle-slider"></span>
+      </label>
     </div>
-    <div class="caption-hint" id="captionHint">Turn on to draw a box over your captions</div>
+    <div class="section-hint" id="captionHint">Turn on to draw a box over your captions</div>
     <div class="video-preview-wrap" id="previewWrap">
       <video id="previewVideo" muted preload="metadata"></video>
       <canvas id="selectionCanvas"></canvas>
@@ -80,6 +83,47 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
     <div class="caption-actions" id="captionActions" style="display:none">
       <button class="caption-btn" onclick="clearSelection()">✕ Clear box</button>
       <span style="font-size:11px;color:#555">✓ Caption area selected</span>
+    </div>
+  </div>
+  <div class="section" id="styleSection" style="display:none">
+    <div class="section-header">
+      <div class="section-label">✨ Spanish Caption Style</div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="styleToggle" checked onchange="toggleStyleSection()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div id="styleControls">
+      <div class="style-grid">
+        <div class="style-item">
+          <label>Text Case</label>
+          <select id="textCase">
+            <option value="upper">UPPERCASE</option>
+            <option value="normal">Normal</option>
+            <option value="lower">lowercase</option>
+          </select>
+        </div>
+        <div class="style-item">
+          <label>Text Color</label>
+          <input type="color" id="textColor" value="#ffffff">
+        </div>
+        <div class="style-item">
+          <label>Outline Color</label>
+          <input type="color" id="outlineColor" value="#000000">
+        </div>
+        <div class="style-item style-full">
+          <label>Font Size <span class="range-val" id="fontSizeVal">5%</span></label>
+          <input type="range" id="fontSize" min="2" max="10" value="5" oninput="document.getElementById('fontSizeVal').textContent=this.value+'%'">
+        </div>
+        <div class="style-item style-full">
+          <label>Outline Width <span class="range-val" id="outlineVal">15%</span></label>
+          <input type="range" id="outlineWidth" min="0" max="30" value="15" oninput="document.getElementById('outlineVal').textContent=this.value+'%'">
+        </div>
+        <div class="style-item style-full">
+          <label>Vertical Position <span class="range-val" id="yPosVal">78%</span></label>
+          <input type="range" id="yPos" min="10" max="95" value="78" oninput="document.getElementById('yPosVal').textContent=this.value+'%'">
+        </div>
+      </div>
     </div>
   </div>
   <button class="btn" id="translateBtn" onclick="startTranslation()">Translate to Spanish</button>
@@ -103,84 +147,66 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
   </div>
 </div>
 <script>
-const fileInput = document.getElementById('fileInput');
-const canvas = document.getElementById('selectionCanvas');
-const ctx = canvas.getContext('2d');
-const previewVideo = document.getElementById('previewVideo');
-let captionBox = null, isDrawing = false, startX, startY;
-
-fileInput.addEventListener('change', () => {
-  const file = fileInput.files[0];
-  if (!file) return;
-  document.getElementById('fileName').textContent = file.name;
+const fileInput=document.getElementById('fileInput');
+const canvas=document.getElementById('selectionCanvas');
+const ctx=canvas.getContext('2d');
+const previewVideo=document.getElementById('previewVideo');
+let captionBox=null,isDrawing=false,startX,startY;
+fileInput.addEventListener('change',()=>{
+  const file=fileInput.files[0];if(!file)return;
+  document.getElementById('fileName').textContent=file.name;
   document.getElementById('uploadArea').classList.add('active');
-  document.getElementById('captionSection').style.display = 'block';
-  previewVideo.src = URL.createObjectURL(file);
-  previewVideo.currentTime = 1;
+  document.getElementById('captionSection').style.display='block';
+  document.getElementById('styleSection').style.display='block';
+  previewVideo.src=URL.createObjectURL(file);previewVideo.currentTime=1;
 });
-
-function toggleCaptionSelector() {
-  const enabled = document.getElementById('captionToggle').checked;
-  const wrap = document.getElementById('previewWrap');
-  if (enabled) {
-    wrap.classList.add('visible');
-    document.getElementById('captionHint').textContent = 'Draw a box over your captions';
-    setTimeout(() => { canvas.width = wrap.offsetWidth; canvas.height = previewVideo.offsetHeight || 200; }, 300);
-  } else {
-    wrap.classList.remove('visible');
-    captionBox = null;
-    document.getElementById('captionActions').style.display = 'none';
-  }
+function toggleCaptionSelector(){
+  const enabled=document.getElementById('captionToggle').checked;
+  const wrap=document.getElementById('previewWrap');
+  if(enabled){wrap.classList.add('visible');document.getElementById('captionHint').textContent='Draw a box over your captions on the video below';setTimeout(()=>{canvas.width=wrap.offsetWidth;canvas.height=previewVideo.offsetHeight||200;},300);}
+  else{wrap.classList.remove('visible');document.getElementById('captionHint').textContent='Turn on to draw a box over your captions';captionBox=null;document.getElementById('captionActions').style.display='none';}
 }
-
-previewVideo.addEventListener('loadedmetadata', () => {
-  setTimeout(() => { canvas.width = document.getElementById('previewWrap').offsetWidth; canvas.height = previewVideo.offsetHeight; }, 100);
-});
-
-canvas.addEventListener('mousedown', (e) => { const r = canvas.getBoundingClientRect(); startX = e.clientX - r.left; startY = e.clientY - r.top; isDrawing = true; captionBox = null; });
-canvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const r = canvas.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; ctx.clearRect(0, 0, canvas.width, canvas.height); drawRect(startX, startY, x - startX, y - startY); });
-canvas.addEventListener('mouseup', (e) => { if (!isDrawing) return; isDrawing = false; const r = canvas.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; const w = x - startX, h = y - startY; if (Math.abs(w) > 10 && Math.abs(h) > 10) { captionBox = { x: Math.min(startX, x) / canvas.width, y: Math.min(startY, y) / canvas.height, w: Math.abs(w) / canvas.width, h: Math.abs(h) / canvas.height }; document.getElementById('captionActions').style.display = 'flex'; } });
-canvas.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.touches[0], r = canvas.getBoundingClientRect(); startX = t.clientX - r.left; startY = t.clientY - r.top; isDrawing = true; captionBox = null; }, { passive: false });
-canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!isDrawing) return; const t = e.touches[0], r = canvas.getBoundingClientRect(); const x = t.clientX - r.left, y = t.clientY - r.top; ctx.clearRect(0, 0, canvas.width, canvas.height); drawRect(startX, startY, x - startX, y - startY); }, { passive: false });
-canvas.addEventListener('touchend', (e) => { e.preventDefault(); if (!isDrawing) return; isDrawing = false; const t = e.changedTouches[0], r = canvas.getBoundingClientRect(); const x = t.clientX - r.left, y = t.clientY - r.top; const w = x - startX, h = y - startY; if (Math.abs(w) > 10 && Math.abs(h) > 10) { captionBox = { x: Math.min(startX, x) / canvas.width, y: Math.min(startY, y) / canvas.height, w: Math.abs(w) / canvas.width, h: Math.abs(h) / canvas.height }; document.getElementById('captionActions').style.display = 'flex'; } }, { passive: false });
-
-function drawRect(x, y, w, h) { ctx.strokeStyle = '#ff4500'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.strokeRect(x, y, w, h); ctx.fillStyle = 'rgba(255,69,0,0.15)'; ctx.fillRect(x, y, w, h); }
-function clearSelection() { captionBox = null; ctx.clearRect(0, 0, canvas.width, canvas.height); document.getElementById('captionActions').style.display = 'none'; }
-function show(id) { document.getElementById(id).style.display = 'block'; }
-function hide(id) { document.getElementById(id).style.display = 'none'; }
-function setStep(n) { for (let i = 1; i <= 5; i++) { const el = document.getElementById('step' + i); el.className = 'step'; if (i < n) el.classList.add('complete'); if (i === n) el.classList.add('active'); } }
-
-async function startTranslation() {
-  const file = fileInput.files[0];
-  if (!file) { alert('Please select a video file first'); return; }
-  document.getElementById('translateBtn').disabled = true;
-  hide('statusDone'); hide('statusError'); show('statusProcessing'); setStep(1);
-  setTimeout(() => setStep(2), 8000);
-  setTimeout(() => setStep(3), 20000);
-  setTimeout(() => setStep(4), 40000);
-  setTimeout(() => setStep(5), 70000);
-  const formData = new FormData();
-  formData.append('video', file);
-  if (document.getElementById('captionToggle').checked && captionBox) {
-    formData.append('captionBox', JSON.stringify(captionBox));
+function toggleStyleSection(){document.getElementById('styleControls').style.display=document.getElementById('styleToggle').checked?'block':'none';}
+previewVideo.addEventListener('loadedmetadata',()=>{setTimeout(()=>{canvas.width=document.getElementById('previewWrap').offsetWidth;canvas.height=previewVideo.offsetHeight;},100);});
+canvas.addEventListener('mousedown',(e)=>{const r=canvas.getBoundingClientRect();startX=e.clientX-r.left;startY=e.clientY-r.top;isDrawing=true;captionBox=null;});
+canvas.addEventListener('mousemove',(e)=>{if(!isDrawing)return;const r=canvas.getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;ctx.clearRect(0,0,canvas.width,canvas.height);drawRect(startX,startY,x-startX,y-startY);});
+canvas.addEventListener('mouseup',(e)=>{if(!isDrawing)return;isDrawing=false;const r=canvas.getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;const w=x-startX,h=y-startY;if(Math.abs(w)>10&&Math.abs(h)>10){captionBox={x:Math.min(startX,x)/canvas.width,y:Math.min(startY,y)/canvas.height,w:Math.abs(w)/canvas.width,h:Math.abs(h)/canvas.height};document.getElementById('captionActions').style.display='flex';}});
+canvas.addEventListener('touchstart',(e)=>{e.preventDefault();const t=e.touches[0],r=canvas.getBoundingClientRect();startX=t.clientX-r.left;startY=t.clientY-r.top;isDrawing=true;captionBox=null;},{passive:false});
+canvas.addEventListener('touchmove',(e)=>{e.preventDefault();if(!isDrawing)return;const t=e.touches[0],r=canvas.getBoundingClientRect();const x=t.clientX-r.left,y=t.clientY-r.top;ctx.clearRect(0,0,canvas.width,canvas.height);drawRect(startX,startY,x-startX,y-startY);},{passive:false});
+canvas.addEventListener('touchend',(e)=>{e.preventDefault();if(!isDrawing)return;isDrawing=false;const t=e.changedTouches[0],r=canvas.getBoundingClientRect();const x=t.clientX-r.left,y=t.clientY-r.top;const w=x-startX,h=y-startY;if(Math.abs(w)>10&&Math.abs(h)>10){captionBox={x:Math.min(startX,x)/canvas.width,y:Math.min(startY,y)/canvas.height,w:Math.abs(w)/canvas.width,h:Math.abs(h)/canvas.height};document.getElementById('captionActions').style.display='flex';}},{passive:false});
+function drawRect(x,y,w,h){ctx.strokeStyle='#ff4500';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.strokeRect(x,y,w,h);ctx.fillStyle='rgba(255,69,0,0.15)';ctx.fillRect(x,y,w,h);}
+function clearSelection(){captionBox=null;ctx.clearRect(0,0,canvas.width,canvas.height);document.getElementById('captionActions').style.display='none';}
+function show(id){document.getElementById(id).style.display='block';}
+function hide(id){document.getElementById(id).style.display='none';}
+function setStep(n){for(let i=1;i<=5;i++){const el=document.getElementById('step'+i);el.className='step';if(i<n)el.classList.add('complete');if(i===n)el.classList.add('active');}}
+async function startTranslation(){
+  const file=fileInput.files[0];
+  if(!file){alert('Please select a video file first');return;}
+  document.getElementById('translateBtn').disabled=true;
+  hide('statusDone');hide('statusError');show('statusProcessing');setStep(1);
+  setTimeout(()=>setStep(2),8000);setTimeout(()=>setStep(3),20000);setTimeout(()=>setStep(4),40000);setTimeout(()=>setStep(5),70000);
+  const formData=new FormData();
+  formData.append('video',file);
+  if(document.getElementById('captionToggle').checked&&captionBox){formData.append('captionBox',JSON.stringify(captionBox));}
+  if(document.getElementById('styleToggle').checked){
+    formData.append('captionStyle',JSON.stringify({
+      textColor:document.getElementById('textColor').value,
+      outlineColor:document.getElementById('outlineColor').value,
+      fontSize:parseInt(document.getElementById('fontSize').value),
+      outlineWidth:parseInt(document.getElementById('outlineWidth').value),
+      yPos:parseInt(document.getElementById('yPos').value)/100,
+      textCase:document.getElementById('textCase').value,
+      addCaptions:true
+    }));
   }
-  try {
-    const res = await fetch('/translate', { method: 'POST', body: formData });
-    const data = await res.json();
+  try{
+    const res=await fetch('/translate',{method:'POST',body:formData});
+    const data=await res.json();
     hide('statusProcessing');
-    if (data.success) {
-      show('statusDone');
-      document.getElementById('resultVideo').src = data.videoUrl;
-    } else {
-      show('statusError');
-      document.getElementById('errorMsg').textContent = data.error;
-    }
-  } catch (err) {
-    hide('statusProcessing');
-    show('statusError');
-    document.getElementById('errorMsg').textContent = 'Could not reach the server.';
-  }
-  document.getElementById('translateBtn').disabled = false;
+    if(data.success){show('statusDone');document.getElementById('resultVideo').src=data.videoUrl;}
+    else{show('statusError');document.getElementById('errorMsg').textContent=data.error;}
+  }catch(err){hide('statusProcessing');show('statusError');document.getElementById('errorMsg').textContent='Could not reach the server.';}
+  document.getElementById('translateBtn').disabled=false;
 }
 </script>
 </body>
