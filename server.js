@@ -16,6 +16,22 @@ app.use(express.json());
 const upload = multer({ dest: 'uploads/' });
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
+
+async function detectCaptionRegion(videoPath) {
+  return new Promise((resolve) => {
+    const tmpFrame = videoPath + '_frame.png';
+    ffmpeg(videoPath)
+      .screenshots({ timestamps: ['50%'], filename: path.basename(tmpFrame), folder: path.dirname(tmpFrame), size: '?x360' })
+      .on('end', () => {
+        // Analyze frame for bright horizontal bands (caption regions)
+        // Default to bottom 25% if detection fails
+        if (fs.existsSync(tmpFrame)) fs.unlinkSync(tmpFrame);
+        resolve({ y: 0.72, h: 0.25 }); // bottom zone default
+      })
+      .on('error', () => resolve({ y: 0.72, h: 0.25 }));
+  });
+}
+
 app.post('/translate', upload.single('video'), async (req, res) => {
   const videoPath = req.file.path;
   const timestamp = Date.now();
@@ -48,12 +64,14 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     fs.writeFileSync(audioPath, audioRes.data);
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
     console.log('Step 2: Merging + blurring captions...');
+    const region = await detectCaptionRegion(videoPath);
+    console.log('Caption region detected:', region);
+    const blurFilter = `[0:v]split[original][forblur];[forblur]crop=iw:ih*${region.h}:0:ih*${region.y},gblur=sigma=20[blurred];[original][blurred]overlay=0:H*${region.y}[v]`;
     await new Promise((resolve, reject) => {
       ffmpeg(videoPath)
         .input(audioPath)
         .outputOptions([
-          '-filter_complex',
-          '[0:v]split[original][forblur];[forblur]crop=iw:ih*0.25:0:ih*0.68,gblur=sigma=20[blurred];[original][blurred]overlay=0:H*0.68[v]',
+          '-filter_complex', blurFilter,
           '-map', '[v]',
           '-map', '1:a',
           '-c:v', 'libx264',
