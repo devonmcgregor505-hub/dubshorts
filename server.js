@@ -8,7 +8,8 @@ const cors = require('cors');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const ffmpegStatic = require('ffmpeg-static');
-const { createCanvas, loadImage } = require('canvas');
+const { createCanvas, loadImage, registerFont } = require('canvas');
+try { registerFont('/nix/store/*/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', { family: 'DejaVu Sans' }); } catch(e) { console.log('Font register failed:', e.message); }
 
 let FFMPEG_PATH = ffmpegStatic;
 try {
@@ -72,7 +73,7 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps) {
     const canvas = createCanvas(vidW, vidH);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0, vidW, vidH);
-    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.font = `bold ${fontSize}px DejaVu`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     const x = vidW / 2;
