@@ -133,7 +133,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       let cmd = ffmpeg(sourceVideo).input(audioPath);
       const outputOpts = [];
       if (hasAss) {
-        const escapedAss = assPath.split("/").pop();
+        const tmpAss = "/tmp/subs_" + timestamp + ".ass"; fs.copyFileSync(assPath, tmpAss); const escapedAss = tmpAss;
         outputOpts.push('-vf', `ass=${escapedAss}`);
         outputOpts.push('-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28');
       } else {
