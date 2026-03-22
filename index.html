@@ -8,8 +8,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0a0a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 .card{background:#111;border:1px solid #1e1e1e;border-radius:20px;padding:48px 40px;width:100%;max-width:480px}
-.logo{font-size:22px;font-weight:700;margin-bottom:6px}
-.logo span{color:#ff4500}
+.logo{font-size:22px;font-weight:700;margin-bottom:6px}.logo span{color:#ff4500}
 .subtitle{font-size:14px;color:#555;margin-bottom:36px}
 .upload-area{border:2px dashed #222;border-radius:14px;padding:36px 20px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:16px;position:relative}
 .upload-area:hover{border-color:#333;background:#141414}
@@ -38,8 +37,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 .caption-btn{padding:8px 14px;border:1px solid #ff4500;background:transparent;color:#ff4500;border-radius:8px;font-size:12px;cursor:pointer}
 .selection-info{font-size:11px;color:#555}
 .btn{width:100%;padding:16px;background:#ff4500;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:all 0.2s}
-.btn:hover{background:#e03d00}
-.btn:disabled{background:#1e1e1e;color:#444;cursor:not-allowed}
+.btn:hover{background:#e03d00}.btn:disabled{background:#1e1e1e;color:#444;cursor:not-allowed}
 .status{margin-top:20px;border-radius:12px;padding:18px 20px;font-size:14px;display:none}
 .status-processing{background:#111500;border:1px solid #2a2a00}
 .status-done{background:#001500;border:1px solid #003300}
@@ -48,10 +46,8 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 .steps{display:flex;flex-direction:column;gap:6px;margin-top:12px}
 .step{display:flex;align-items:center;gap:10px;font-size:13px;color:#444}
 .step-dot{width:8px;height:8px;border-radius:50%;background:#222;flex-shrink:0}
-.step.active .step-dot{background:#ffdd00}
-.step.active{color:#ffdd88}
-.step.complete .step-dot{background:#00cc44}
-.step.complete{color:#88ff88}
+.step.active .step-dot{background:#ffdd00}.step.active{color:#ffdd88}
+.step.complete .step-dot{background:#00cc44}.step.complete{color:#88ff88}
 .download-btn{display:block;margin-top:14px;padding:14px;background:#00cc44;color:#000;border-radius:10px;text-align:center;text-decoration:none;font-weight:700;font-size:15px}
 .error-msg{color:#ff6666;font-size:13px;margin-top:8px}
 </style>
@@ -85,7 +81,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
     </div>
     <div class="caption-actions" id="captionActions" style="display:none">
       <button class="caption-btn" onclick="clearSelection()">✕ Clear box</button>
-      <span class="selection-info" id="selectionInfo">✓ Caption area selected</span>
+      <span class="selection-info">✓ Caption area selected</span>
     </div>
   </div>
   <button class="btn" id="translateBtn" onclick="startTranslation()">Translate to Spanish</button>
@@ -96,7 +92,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
       <div class="step" id="step2"><div class="step-dot"></div> Detecting speakers</div>
       <div class="step" id="step3"><div class="step-dot"></div> Translating to Spanish</div>
       <div class="step" id="step4"><div class="step-dot"></div> Generating dubbed voices</div>
-      <div class="step" id="step5"><div class="step-dot"></div> Finalising video</div>
+      <div class="step" id="step5"><div class="step-dot"></div> Adding Spanish captions</div>
     </div>
   </div>
   <div class="status status-done" id="statusDone">
@@ -110,16 +106,16 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 </div>
 <script>
 const fileInput=document.getElementById('fileInput');
-const uploadArea=document.getElementById('uploadArea');
 const canvas=document.getElementById('selectionCanvas');
 const ctx=canvas.getContext('2d');
 const previewVideo=document.getElementById('previewVideo');
 let captionBox=null,isDrawing=false,startX,startY;
+
 fileInput.addEventListener('change',()=>{
   const file=fileInput.files[0];
   if(!file)return;
   document.getElementById('fileName').textContent=file.name;
-  uploadArea.classList.add('active');
+  document.getElementById('uploadArea').classList.add('active');
   document.getElementById('captionSection').style.display='block';
   previewVideo.src=URL.createObjectURL(file);
   previewVideo.currentTime=1;
@@ -127,60 +123,106 @@ fileInput.addEventListener('change',()=>{
 function toggleCaptionSelector(){
   const enabled=document.getElementById('captionToggle').checked;
   const wrap=document.getElementById('previewWrap');
-  const hint=document.getElementById('captionHint');
-  if(enabled){
-    wrap.classList.add('visible');
-    hint.textContent='Draw a box over your captions on the video below';
-    setTimeout(()=>{canvas.width=wrap.offsetWidth;canvas.height=previewVideo.offsetHeight||200;},300);
-  }else{
-    wrap.classList.remove('visible');
-    hint.textContent='Turn on to draw a box over your captions';
-    captionBox=null;
-    document.getElementById('captionActions').style.display='none';
-  }
+  if(enabled){wrap.classList.add('visible');document.getElementById('captionHint').textContent='Draw a box over your captions';setTimeout(()=>{canvas.width=wrap.offsetWidth;canvas.height=previewVideo.offsetHeight||200;},300);}
+  else{wrap.classList.remove('visible');captionBox=null;document.getElementById('captionActions').style.display='none';}
 }
-previewVideo.addEventListener('loadedmetadata',()=>{
-  setTimeout(()=>{
-    canvas.width=document.getElementById('previewWrap').offsetWidth;
-    canvas.height=previewVideo.offsetHeight;
-  },100);
-});
-canvas.addEventListener('mousedown',(e)=>{
-  const r=canvas.getBoundingClientRect();
-  startX=e.clientX-r.left;startY=e.clientY-r.top;isDrawing=true;captionBox=null;
-});
-canvas.addEventListener('mousemove',(e)=>{
-  if(!isDrawing)return;
-  const r=canvas.getBoundingClientRect();
-  const x=e.clientX-r.left,y=e.clientY-r.top;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  drawRect(startX,startY,x-startX,y-startY);
-});
-canvas.addEventListener('mouseup',(e)=>{
-  if(!isDrawing)return;
-  isDrawing=false;
-  const r=canvas.getBoundingClientRect();
-  const x=e.clientX-r.left,y=e.clientY-r.top;
-  const w=x-startX,h=y-startY;
-  if(Math.abs(w)>10&&Math.abs(h)>10){
-    captionBox={x:Math.min(startX,x)/canvas.width,y:Math.min(startY,y)/canvas.height,w:Math.abs(w)/canvas.width,h:Math.abs(h)/canvas.height};
-    document.getElementById('captionActions').style.display='flex';
-  }
-});
-canvas.addEventListener('touchstart',(e)=>{e.preventDefault();const t=e.touches[0],r=canvas.getBoundingClientRect();startX=t.clientX-r.left;startY=t.clientY-r.top;isDrawing=true;captionBox=null;},{passive:false});
-canvas.addEventListener('touchmove',(e)=>{e.preventDefault();if(!isDrawing)return;const t=e.touches[0],r=canvas.getBoundingClientRect();const x=t.clientX-r.left,y=t.clientY-r.top;ctx.clearRect(0,0,canvas.width,canvas.height);drawRect(startX,startY,x-startX,y-startY);},{passive:false});
-canvas.addEventListener('touchend',(e)=>{e.preventDefault();if(!isDrawing)return;isDrawing=false;const t=e.changedTouches[0],r=canvas.getBoundingClientRect();const x=t.clientX-r.left,y=t.clientY-r.top;const w=x-startX,h=y-startY;if(Math.abs(w)>10&&Math.abs(h)>10){captionBox={x:Math.min(startX,x)/canvas.width,y:Math.min(startY,y)/canvas.height,w:Math.abs(w)/canvas.width,h:Math.abs(h)/canvas.height};document.getElementById('captionActions').style.display='flex';}},{passive:false});
+previewVideo.addEventListener('loadedmetadata',()=>{setTimeout(()=>{canvas.width=document.getElementById('previewWrap').offsetWidth;canvas.height=previewVideo.offsetHeight;},100);});
+canvas.addEventListener('mousedown',(e)=>{const r=canvas.getBoundingClientRect();startX=e.clientX-r.left;startY=e.clientY-r.top;isDrawing=true;captionBox=null;});
+canvas.addEventListener('mousemove',(e)=>{if(!isDrawing)return;const r=canvas.getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;ctx.clearRect(0,0,canvas.width,canvas.height);drawRect(startX,startY,x-startX,y-startY);});
+canvas.addEventListener('mouseup',(e)=>{if(!isDrawing)return;isDrawing=false;const r=canvas.getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;const w=x-startX,h=y-startY;if(Math.abs(w)>10&&Math.abs(h)>10){captionBox={x:Math.min(startX,x)/canvas.width,y:Math.min(startY,y)/canvas.height,w:Math.abs(w)/canvas.width,h:Math.abs(h)/canvas.height};document.getElementById('captionActions').style.display='flex';}});
 function drawRect(x,y,w,h){ctx.strokeStyle='#ff4500';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.strokeRect(x,y,w,h);ctx.fillStyle='rgba(255,69,0,0.15)';ctx.fillRect(x,y,w,h);}
 function clearSelection(){captionBox=null;ctx.clearRect(0,0,canvas.width,canvas.height);document.getElementById('captionActions').style.display='none';}
 function show(id){document.getElementById(id).style.display='block';}
 function hide(id){document.getElementById(id).style.display='none';}
 function setStep(n){for(let i=1;i<=5;i++){const el=document.getElementById('step'+i);el.className='step';if(i<n)el.classList.add('complete');if(i===n)el.classList.add('active');}}
+
+function parseSrt(srt) {
+  const blocks = srt.trim().split(/\n\n+/);
+  const cues = [];
+  for (const block of blocks) {
+    const lines = block.trim().split('\n');
+    if (lines.length < 3) continue;
+    const timeLine = lines[1];
+    if (!timeLine.includes('-->')) continue;
+    const [startStr, endStr] = timeLine.split('-->').map(s => s.trim());
+    const text = lines.slice(2).join(' ').replace(/<[^>]+>/g, '').trim();
+    cues.push({ start: srtToSec(startStr), end: srtToSec(endStr), text });
+  }
+  return cues;
+}
+function srtToSec(t) {
+  const [h,m,rest] = t.split(':');
+  const [s,ms] = rest.split(',');
+  return parseInt(h)*3600+parseInt(m)*60+parseInt(s)+parseInt(ms)/1000;
+}
+
+async function burnCaptionsInBrowser(videoUrl, srtText) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.src = videoUrl;
+    video.muted = false;
+    video.crossOrigin = 'anonymous';
+
+    video.addEventListener('loadedmetadata', () => {
+      const cues = parseSrt(srtText);
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = video.videoWidth;
+      offCanvas.height = video.videoHeight;
+      const offCtx = offCanvas.getContext('2d');
+      const stream = offCanvas.captureStream(30);
+
+      // Get audio from video
+      const audioCtx = new AudioContext();
+      const src = audioCtx.createMediaElementSource(video);
+      const dest = audioCtx.createMediaStreamDestination();
+      src.connect(dest);
+      src.connect(audioCtx.destination);
+      const audioStream = dest.stream;
+
+      // Combine video + audio
+      const combined = new MediaStream([...stream.getTracks(), ...audioStream.getTracks()]);
+      const recorder = new MediaRecorder(combined, { mimeType: 'video/webm;codecs=vp9' });
+      const chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        resolve(URL.createObjectURL(blob));
+      };
+
+      const fontSize = Math.round(offCanvas.height * 0.055);
+
+      function drawFrame() {
+        offCtx.drawImage(video, 0, 0, offCanvas.width, offCanvas.height);
+        const t = video.currentTime;
+        const cue = cues.find(c => t >= c.start && t < c.end);
+        if (cue) {
+          offCtx.font = `bold ${fontSize}px Arial`;
+          offCtx.textAlign = 'center';
+          offCtx.lineWidth = Math.round(fontSize * 0.12);
+          offCtx.strokeStyle = 'black';
+          offCtx.strokeText(cue.text, offCanvas.width/2, offCanvas.height * 0.78);
+          offCtx.fillStyle = 'white';
+          offCtx.fillText(cue.text, offCanvas.width/2, offCanvas.height * 0.78);
+        }
+        if (!video.ended && !video.paused) requestAnimationFrame(drawFrame);
+      }
+
+      recorder.start();
+      video.play();
+      video.addEventListener('play', drawFrame);
+      video.addEventListener('ended', () => { setTimeout(() => recorder.stop(), 300); });
+    });
+
+    video.load();
+  });
+}
+
 async function startTranslation(){
   const file=fileInput.files[0];
   if(!file){alert('Please select a video file first');return;}
   document.getElementById('translateBtn').disabled=true;
   hide('statusDone');hide('statusError');show('statusProcessing');setStep(1);
-  setTimeout(()=>setStep(2),8000);setTimeout(()=>setStep(3),20000);setTimeout(()=>setStep(4),40000);setTimeout(()=>setStep(5),70000);
+  setTimeout(()=>setStep(2),8000);setTimeout(()=>setStep(3),20000);setTimeout(()=>setStep(4),40000);
   const formData=new FormData();
   formData.append('video',file);
   if(document.getElementById('captionToggle').checked&&captionBox){
@@ -189,9 +231,20 @@ async function startTranslation(){
   try{
     const res=await fetch('/translate',{method:'POST',body:formData});
     const data=await res.json();
-    hide('statusProcessing');
-    if(data.success){show('statusDone');document.getElementById('downloadBtn').href=data.downloadUrl;}
-    else{show('statusError');document.getElementById('errorMsg').textContent=data.error;}
+    if(!data.success){hide('statusProcessing');show('statusError');document.getElementById('errorMsg').textContent=data.error;document.getElementById('translateBtn').disabled=false;return;}
+    
+    if(data.srt && data.srt.length > 10){
+      setStep(5);
+      console.log('Burning captions in browser...');
+      const finalUrl = await burnCaptionsInBrowser(data.downloadUrl, data.srt);
+      hide('statusProcessing');show('statusDone');
+      const btn = document.getElementById('downloadBtn');
+      btn.href = finalUrl;
+      btn.download = 'spanish_dubbed.mp4';
+    } else {
+      hide('statusProcessing');show('statusDone');
+      document.getElementById('downloadBtn').href=data.downloadUrl;
+    }
   }catch(err){hide('statusProcessing');show('statusError');document.getElementById('errorMsg').textContent='Could not reach the server.';}
   document.getElementById('translateBtn').disabled=false;
 }
