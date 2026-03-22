@@ -203,6 +203,49 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     fs.writeFileSync(audioPath, dubbedRes.data); // reuse audioPath as temp dubbed video
 
     let cues = [];
+    if (captionStyle && captionStyle.enabled) {
+      try {
+        console.log('Transcribing dubbed video for captions...');
+        const sttRes = await axios.post('https://modelslab.com/api/v6/voice/speech_to_text', {
+          key: process.env.MODELSLAB_API_KEY,
+          init_audio: dubbedVideoUrl,
+          language: 'es'
+        }, { headers: { 'Content-Type': 'application/json' }, timeout: 60000 });
+
+        console.log('STT response:', JSON.stringify(sttRes.data).slice(0, 300));
+
+        let transcript = null;
+        if (sttRes.data.status === 'success' && sttRes.data.text) {
+          transcript = sttRes.data.text;
+        } else if (sttRes.data.status === 'processing' && sttRes.data.fetch_result) {
+          let sttAttempts = 0;
+          while (sttAttempts < 20) {
+            await new Promise(r => setTimeout(r, 3000));
+            sttAttempts++;
+            const sttPoll = await axios.post(sttRes.data.fetch_result, { key: process.env.MODELSLAB_API_KEY }, { headers: { 'Content-Type': 'application/json' } });
+            if (sttPoll.data.status === 'success' && sttPoll.data.text) {
+              transcript = sttPoll.data.text;
+              break;
+            }
+          }
+        }
+
+        if (transcript) {
+          console.log('Got transcript:', transcript.slice(0, 100));
+          // Build simple timed cues from transcript words
+          // Get video duration from ffprobe
+          const probeResult = spawnSync(FFMPEG_PATH, ['-i', audioPath, '-f', 'null', '-'], { encoding: 'utf8' });
+          const durMatch = (probeResult.stderr || '').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
+          const totalDur = durMatch ? parseInt(durMatch[1])*3600 + parseInt(durMatch[2])*60 + parseFloat(durMatch[3]) : 30;
+          const words = transcript.trim().split(/\s+/).filter(w => w.length > 0);
+          const wordDur = totalDur / words.length;
+          words.forEach((word, i) => {
+            cues.push({ start: i * wordDur, end: (i + 1) * wordDur, text: word });
+          });
+          console.log('Built', cues.length, 'cues from transcript');
+        }
+      } catch(e) { console.log('Transcription failed:', e.message); }
+    }
 
     let videoForMerge = audioPath; // audioPath now holds the complete dubbed video from ModelsLab
 
