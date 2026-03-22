@@ -73,7 +73,7 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps) {
     const canvas = createCanvas(vidW, vidH);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0, vidW, vidH);
-    ctx.font = `bold ${fontSize}px DejaVu`;
+    ctx.font = `px DejaVu`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     const x = vidW / 2;
