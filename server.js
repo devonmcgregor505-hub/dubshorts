@@ -21,6 +21,7 @@ app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); }
 app.post('/translate', upload.single('video'), async (req, res) => {
   const videoPath = req.file.path;
   const timestamp = Date.now();
+  const cleanPath = 'uploads/clean_' + timestamp + '.mp4';
   const audioPath = 'uploads/spanish_' + timestamp + '.mp3';
   const outputPath = 'uploads/final_' + timestamp + '.mp4';
   console.log('File received:', req.file.originalname);
@@ -32,7 +33,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
     console.log('Video URL:', videoUrl);
     console.log('Step 2: Removing captions with Replicate...');
-    let cleanVideoUrl = videoUrl;
+    let fileToSend = videoPath;
+    let filenameToSend = req.file.originalname;
     try {
       const prediction = await replicate.predictions.create({ version: '247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d', input: { video: videoUrl, method: 'hybrid', conf_threshold: 0.25, margin: 5 } });
       console.log('Prediction created:', prediction.id);
@@ -44,18 +46,23 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         completed = await replicate.predictions.get(prediction.id);
         console.log('Replicate poll ' + polls + ': ' + completed.status);
       }
-      console.log('Replicate output:', JSON.stringify(completed.output));
       if (completed.status === 'succeeded' && completed.output) {
         const output = completed.output;
-        if (typeof output === 'string') cleanVideoUrl = output;
-        else if (Array.isArray(output) && output.length > 0) cleanVideoUrl = typeof output[0] === 'string' ? output[0] : String(output[0]);
-        else if (output && typeof output === 'object') cleanVideoUrl = output.url || output.video || output.output || videoUrl;
+        let replicateUrl = typeof output === 'string' ? output : (Array.isArray(output) ? String(output[0]) : (output.url || output.video || null));
+        console.log('Replicate URL:', replicateUrl);
+        if (replicateUrl) {
+          console.log('Downloading clean video...');
+          const dlRes = await axios.get(replicateUrl, { responseType: 'arraybuffer' });
+          fs.writeFileSync(cleanPath, dlRes.data);
+          fileToSend = cleanPath;
+          filenameToSend = 'clean_video.mp4';
+          console.log('Clean video saved locally');
+        }
       }
-      console.log('Clean video URL:', cleanVideoUrl);
     } catch (repErr) { console.error('Replicate error (using original):', repErr.message); }
     console.log('Step 3: Sending to ElevenLabs...');
     const form = new FormData();
-    form.append('source_url', cleanVideoUrl);
+    form.append('file', fs.createReadStream(fileToSend), { filename: filenameToSend, contentType: 'video/mp4' });
     form.append('source_lang', 'en');
     form.append('target_lang', 'es');
     form.append('num_speakers', '0');
@@ -79,17 +86,16 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
     console.log('Step 4: Merging with FFmpeg...');
     await new Promise((resolve, reject) => {
-      ffmpeg().input(cleanVideoUrl).input(audioPath).outputOptions(['-map 0:v', '-map 1:a', '-c:v copy', '-c:a aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
+      ffmpeg().input(fileToSend).input(audioPath).outputOptions(['-map 0:v', '-map 1:a', '-c:v copy', '-c:a aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
     });
-    if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-    if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+    [videoPath, cleanPath, audioPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
     const token = Date.now().toString();
     app.get('/download/' + token, (req, res) => { res.download(outputPath, 'spanish_dubbed.mp4', () => { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); }); });
     res.json({ success: true, downloadUrl: '/download/' + token });
   } catch (err) {
     console.error('Error:', err.message);
     if (err.response) console.error('API error:', JSON.stringify(err.response.data));
-    [videoPath, audioPath, outputPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
+    [videoPath, cleanPath, audioPath, outputPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
     res.status(500).json({ success: false, error: err.message });
   }
 });
