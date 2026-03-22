@@ -22,7 +22,6 @@ function srtTimeToSeconds(t) {
   const [s,ms] = rest.split(',');
   return parseInt(h)*3600 + parseInt(m)*60 + parseInt(s) + parseInt(ms)/1000;
 }
-
 function toAssTime(seconds) {
   const h = Math.floor(seconds/3600);
   const m = Math.floor((seconds%3600)/60);
@@ -30,20 +29,8 @@ function toAssTime(seconds) {
   const cs = Math.floor((seconds%1)*100);
   return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
 }
-
 function srtToWordAss(srtContent) {
-  const header = `[Script Info]
-ScriptType: v4.00+
-PlayResX: 1080
-PlayResY: 1920
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,55,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,3,0,2,10,10,80,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-`;
+  const header = `[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,55,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,3,0,2,10,10,80,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
   const blocks = srtContent.trim().split(/\n\n+/);
   let events = '';
   for (const block of blocks) {
@@ -72,7 +59,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   const timestamp = Date.now();
   const audioPath = 'uploads/spanish_' + timestamp + '.mp3';
   const srtPath = 'uploads/spanish_' + timestamp + '.srt';
-  const assPath = 'uploads/spanish_' + timestamp + '.ass';
+  const assPath = '/tmp/subs_' + timestamp + '.ass';
   const blurredPath = 'uploads/blurred_' + timestamp + '.mp4';
   const outputPath = 'uploads/final_' + timestamp + '.mp4';
   const allFiles = [videoPath, audioPath, srtPath, assPath, blurredPath];
@@ -114,7 +101,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         const assContent = srtToWordAss(srtRes.data);
         fs.writeFileSync(assPath, assContent);
         hasAss = true;
-        console.log('ASS subtitle file created!'); console.log('ASS content preview:', assContent.substring(0, 300));
+        console.log('ASS saved to /tmp, words:', assContent.split('Dialogue').length - 1);
       }
     } catch(e) { console.log('SRT fetch failed:', e.message); }
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
@@ -133,8 +120,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       let cmd = ffmpeg(sourceVideo).input(audioPath);
       const outputOpts = [];
       if (hasAss) {
-        const tmpAss = "/tmp/subs_" + timestamp + ".ass"; fs.copyFileSync(assPath, tmpAss); const escapedAss = tmpAss;
-        outputOpts.push('-vf', `ass=${escapedAss}`);
+        console.log('Burning ASS from path:', assPath);
+        outputOpts.push('-vf', `ass=${assPath}`);
         outputOpts.push('-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28');
       } else {
         outputOpts.push('-c:v', 'copy');
