@@ -32,9 +32,27 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
     console.log('Video URL:', videoUrl);
     console.log('Step 2: Removing captions with Replicate...');
-    const prediction = await replicate.predictions.create({ version: "247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d", input: { video: videoUrl, method: "hybrid", conf_threshold: 0.25, margin: 5 } }); let cleanOutput = await replicate.wait(prediction); const cleanVideoUrl = cleanOutput?.output || videoUrl;
-    const cleanVideoUrl = cleanOutput?.href || cleanOutput?.url?.href || (typeof cleanOutput === 'string' ? cleanOutput : null); console.log('DEBUG cleanOutput:', JSON.stringify(cleanOutput));
-    console.log('Captions removed URL:', cleanVideoUrl);
+    let cleanVideoUrl = videoUrl;
+    try {
+      const prediction = await replicate.predictions.create({ version: '247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d', input: { video: videoUrl, method: 'hybrid', conf_threshold: 0.25, margin: 5 } });
+      console.log('Prediction created:', prediction.id);
+      let completed = await replicate.predictions.get(prediction.id);
+      let polls = 0;
+      while (completed.status !== 'succeeded' && completed.status !== 'failed' && polls < 60) {
+        await new Promise(r => setTimeout(r, 5000));
+        polls++;
+        completed = await replicate.predictions.get(prediction.id);
+        console.log('Replicate poll ' + polls + ': ' + completed.status);
+      }
+      console.log('Replicate output:', JSON.stringify(completed.output));
+      if (completed.status === 'succeeded' && completed.output) {
+        const output = completed.output;
+        if (typeof output === 'string') cleanVideoUrl = output;
+        else if (Array.isArray(output) && output.length > 0) cleanVideoUrl = typeof output[0] === 'string' ? output[0] : String(output[0]);
+        else if (output && typeof output === 'object') cleanVideoUrl = output.url || output.video || output.output || videoUrl;
+      }
+      console.log('Clean video URL:', cleanVideoUrl);
+    } catch (repErr) { console.error('Replicate error (using original):', repErr.message); }
     console.log('Step 3: Sending to ElevenLabs...');
     const form = new FormData();
     form.append('source_url', cleanVideoUrl);
@@ -52,12 +70,14 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       attempts++;
       const checkRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } });
       status = checkRes.data.status;
-      console.log('Check ' + attempts + ': ' + status);
+      console.log('ElevenLabs check ' + attempts + ': ' + status);
     }
     if (status !== 'dubbed') throw new Error('Dubbing failed: ' + status);
+    console.log('Dubbing complete!');
     const audioRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/audio/es', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, responseType: 'arraybuffer' });
     fs.writeFileSync(audioPath, audioRes.data);
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
+    console.log('Step 4: Merging with FFmpeg...');
     await new Promise((resolve, reject) => {
       ffmpeg().input(cleanVideoUrl).input(audioPath).outputOptions(['-map 0:v', '-map 1:a', '-c:v copy', '-c:a aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
     });
