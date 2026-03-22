@@ -6,18 +6,38 @@ const FormData = require('form-data');
 const fs = require('fs');
 const cors = require('cors');
 const path = require('path');
-const { execSync } = require('child_process');
-const ffmpeg = require('fluent-ffmpeg');
+const { execSync, spawnSync } = require('child_process');
+const ffmpegStatic = require('ffmpeg-static');
 
-// Use system ffmpeg NOT ffmpeg-static (system has libass)
-const FFMPEG_PATH = execSync('which ffmpeg').toString().trim();
-ffmpeg.setFfmpegPath(FFMPEG_PATH);
-console.log('Using ffmpeg:', FFMPEG_PATH);
+// Try system ffmpeg first (has libass), fall back to ffmpeg-static
+let FFMPEG_PATH = ffmpegStatic;
+try {
+  const syspath = execSync('which ffmpeg 2>/dev/null || echo ""').toString().trim();
+  if (syspath) {
+    FFMPEG_PATH = syspath;
+    console.log('Using system ffmpeg:', FFMPEG_PATH);
+  } else {
+    console.log('Using ffmpeg-static:', FFMPEG_PATH);
+  }
+} catch(e) {
+  console.log('Using ffmpeg-static:', FFMPEG_PATH);
+}
 
-const app = express();
+// Check if libass is available
+let HAS_LIBASS = false;
+try {
+  const result = spawnSync(FFMPEG_PATH, ['-filters'], { encoding: 'utf8' });
+  HAS_LIBASS = result.stdout.includes('ass') || result.stderr.includes('ass');
+  console.log('libass available:', HAS_LIBASS);
+} catch(e) {
+  console.log('Could not check libass');
+}
+
+const express2 = require('express');
+const app = express2();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
-app.use(express.json());
+app.use(express2.json());
 const upload = multer({ dest: 'uploads/' });
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
@@ -55,6 +75,14 @@ function srtToWordAss(srtContent) {
     }
   }
   return header + events;
+}
+
+function runFFmpeg(args, timeout = 180000) {
+  const result = spawnSync(FFMPEG_PATH, args, { timeout, maxBuffer: 100 * 1024 * 1024 });
+  if (result.status !== 0) {
+    throw new Error('FFmpeg failed: ' + (result.stderr || '').toString().slice(-500));
+  }
+  return result;
 }
 
 app.post('/translate', upload.single('video'), async (req, res) => {
@@ -97,8 +125,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       const srtRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/transcript/es?format_type=srt', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } });
       if (srtRes.data && srtRes.data.length > 10) {
         fs.writeFileSync(assPath, srtToWordAss(srtRes.data));
-        hasAss = true;
-        console.log('ASS written to:', assPath);
+        hasAss = HAS_LIBASS;
+        console.log('ASS written, will burn:', hasAss);
       }
     } catch(e) { console.log('SRT failed:', e.message); }
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
@@ -109,20 +137,20 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       console.log('Blurring...');
       const { x, y, w, h } = captionBox;
       const blurFilter = `[0:v]split[original][forblur];[forblur]crop=iw*${w.toFixed(4)}:ih*${h.toFixed(4)}:iw*${x.toFixed(4)}:ih*${y.toFixed(4)},gblur=sigma=25[blurred];[original][blurred]overlay=W*${x.toFixed(4)}:H*${y.toFixed(4)}[v]`;
-      execSync(`${FFMPEG_PATH} -y -i "${videoPath}" -filter_complex "${blurFilter}" -map "[v]" -map "0:a?" -c:v libx264 -preset ultrafast -crf 28 -threads 2 "${blurredPath}"`, { timeout: 120000 });
+      runFFmpeg(['-y', '-i', videoPath, '-filter_complex', blurFilter, '-map', '[v]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-threads', '2', blurredPath]);
       videoForMerge = blurredPath;
       console.log('Blur done!');
     }
 
     if (hasAss) {
-      console.log('Burning subtitles using system ffmpeg...');
-      execSync(`${FFMPEG_PATH} -y -i "${videoForMerge}" -vf "ass=${assPath}" -c:v libx264 -preset ultrafast -crf 28 -threads 2 "${subtitledPath}"`, { timeout: 180000 });
+      console.log('Burning subtitles...');
+      runFFmpeg(['-y', '-i', videoForMerge, '-vf', `ass=${assPath}`, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-threads', '2', subtitledPath]);
       videoForMerge = subtitledPath;
       console.log('Subtitles burned!');
     }
 
     console.log('Step 2: Final merge...');
-    execSync(`${FFMPEG_PATH} -y -i "${videoForMerge}" -i "${audioPath}" -map 0:v -map 1:a -c:v copy -c:a aac -shortest "${outputPath}"`, { timeout: 120000 });
+    runFFmpeg(['-y', '-i', videoForMerge, '-i', audioPath, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-shortest', outputPath]);
 
     console.log('Done!');
     allFiles.forEach(f => { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch(e) {} });
