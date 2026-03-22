@@ -24,17 +24,17 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   const outputPath = 'uploads/final_' + timestamp + '.mp4';
   console.log('File received:', req.file.originalname);
   try {
-    console.log('Step 1: Blurring caption area with FFmpeg...');
+    console.log('Step 1: Blurring captions with FFmpeg...');
     await new Promise((resolve, reject) => {
-      ffmpeg().input(videoPath)
-        .videoFilters('boxblur=20:1:cr=0:ar=0,crop=iw:ih*0.25:0:ih*0.65,boxblur=20:1')
-        .outputOptions(['-filter_complex', '[0:v]crop=iw:ih*0.3:0:ih*0.65,boxblur=30:5[blurred];[0:v][blurred]overlay=0:H*0.65[v]', '-map', '[v]', '-map', '0:a', '-c:a', 'copy'])
+      ffmpeg(videoPath)
+        .complexFilter('[0:v]crop=iw:ih*0.3:0:ih*0.65,boxblur=30:5[blurred];[0:v][blurred]overlay=0:H*0.65[v]')
+        .outputOptions(['-map', '[v]', '-map', '0:a', '-c:a', 'copy', '-preset', 'fast'])
         .output(cleanPath)
         .on('end', resolve)
-        .on('error', reject)
+        .on('error', (err) => { console.error('FFmpeg blur error:', err.message); reject(err); })
         .run();
     });
-    console.log('Caption area blurred!');
+    console.log('Blur done!');
     console.log('Step 2: Sending to ElevenLabs...');
     const form = new FormData();
     form.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: 'video/mp4' });
@@ -61,7 +61,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
     console.log('Step 3: Merging blurred video + Spanish audio...');
     await new Promise((resolve, reject) => {
-      ffmpeg().input(cleanPath).input(audioPath).outputOptions(['-map 0:v', '-map 1:a', '-c:v copy', '-c:a aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
+      ffmpeg(cleanPath).input(audioPath).outputOptions(['-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
     });
     console.log('Done!');
     [videoPath, cleanPath, audioPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
