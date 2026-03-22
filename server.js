@@ -8,9 +8,12 @@ const cors = require('cors');
 const path = require('path');
 const { execSync } = require('child_process');
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegStatic = require('ffmpeg-static');
-ffmpeg.setFfmpegPath(ffmpegStatic);
-const FFMPEG = ffmpegStatic;
+
+// Use system ffmpeg NOT ffmpeg-static (system has libass)
+const FFMPEG_PATH = execSync('which ffmpeg').toString().trim();
+ffmpeg.setFfmpegPath(FFMPEG_PATH);
+console.log('Using ffmpeg:', FFMPEG_PATH);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
@@ -100,29 +103,26 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     } catch(e) { console.log('SRT failed:', e.message); }
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
 
-    // Step A: blur if captionBox
-    let videoForSubs = videoPath;
+    let videoForMerge = videoPath;
+
     if (captionBox) {
       console.log('Blurring...');
       const { x, y, w, h } = captionBox;
       const blurFilter = `[0:v]split[original][forblur];[forblur]crop=iw*${w.toFixed(4)}:ih*${h.toFixed(4)}:iw*${x.toFixed(4)}:ih*${y.toFixed(4)},gblur=sigma=25[blurred];[original][blurred]overlay=W*${x.toFixed(4)}:H*${y.toFixed(4)}[v]`;
-      execSync(`"${FFMPEG}" -y -i "${videoPath}" -filter_complex "${blurFilter}" -map "[v]" -map "0:a?" -c:v libx264 -preset ultrafast -crf 28 -threads 2 "${blurredPath}"`, { timeout: 120000 });
-      videoForSubs = blurredPath;
+      execSync(`${FFMPEG_PATH} -y -i "${videoPath}" -filter_complex "${blurFilter}" -map "[v]" -map "0:a?" -c:v libx264 -preset ultrafast -crf 28 -threads 2 "${blurredPath}"`, { timeout: 120000 });
+      videoForMerge = blurredPath;
       console.log('Blur done!');
     }
 
-    // Step B: burn subtitles using execSync so path is passed directly
-    let videoForMerge = videoForSubs;
     if (hasAss) {
-      console.log('Burning subtitles with execSync...');
-      execSync(`"${FFMPEG}" -y -i "${videoForSubs}" -vf "ass=${assPath}" -c:v libx264 -preset ultrafast -crf 28 -threads 2 "${subtitledPath}"`, { timeout: 180000 });
+      console.log('Burning subtitles using system ffmpeg...');
+      execSync(`${FFMPEG_PATH} -y -i "${videoForMerge}" -vf "ass=${assPath}" -c:v libx264 -preset ultrafast -crf 28 -threads 2 "${subtitledPath}"`, { timeout: 180000 });
       videoForMerge = subtitledPath;
       console.log('Subtitles burned!');
     }
 
-    // Step C: merge final audio
-    console.log('Step 2: Merging audio...');
-    execSync(`"${FFMPEG}" -y -i "${videoForMerge}" -i "${audioPath}" -map 0:v -map 1:a -c:v copy -c:a aac -shortest "${outputPath}"`, { timeout: 120000 });
+    console.log('Step 2: Final merge...');
+    execSync(`${FFMPEG_PATH} -y -i "${videoForMerge}" -i "${audioPath}" -map 0:v -map 1:a -c:v copy -c:a aac -shortest "${outputPath}"`, { timeout: 120000 });
 
     console.log('Done!');
     allFiles.forEach(f => { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch(e) {} });
