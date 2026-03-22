@@ -232,22 +232,7 @@ async function startTranslation(){
     const res=await fetch('/translate',{method:'POST',body:formData});
     const data=await res.json();
     if(!data.success){hide('statusProcessing');show('statusError');document.getElementById('errorMsg').textContent=data.error;document.getElementById('translateBtn').disabled=false;return;}
-    
-    if(data.srt && data.srt.length > 10){
-      setStep(5); document.getElementById("step5").innerHTML = "<div class=\"step-dot\"></div> Adding Spanish captions... <span id=\"capProg\">0%</span>";
-      console.log('Burning captions in browser...');
-      const finalUrl = await burnCaptionsInBrowser(data.downloadUrl, data.srt);
-      hide('statusProcessing');show('statusDone');
-      const btn = document.getElementById('downloadBtn');
-      btn.href = finalUrl;
-      btn.download = 'spanish_dubbed.mp4';
-    } else {
-      hide('statusProcessing');show('statusDone');
-      document.getElementById('downloadBtn').href=data.downloadUrl;
-    }
-  }catch(err){hide('statusProcessing');show('statusError');document.getElementById('errorMsg').textContent='Could not reach the server.';}
-  document.getElementById('translateBtn').disabled=false;
-}
+    show('statusDone');document.getElementById('resultVideo').src=data.videoUrl;
 </script>
 </body>
 </html>
