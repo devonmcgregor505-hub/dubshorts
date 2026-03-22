@@ -41,8 +41,8 @@ function srtToWordAss(srtContent) {
   const lines = [
     '[Script Info]',
     'ScriptType: v4.00+',
-    'PlayResX: 0',
-    'PlayResY: 0',
+    'PlayResX: 1080',
+    'PlayResY: 1920',
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
