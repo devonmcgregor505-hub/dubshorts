@@ -49,12 +49,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     }
     if (status !== 'dubbed') throw new Error('Dubbing failed: ' + status);
     console.log('Dubbing complete!');
-
-    // Get Spanish audio
     const audioRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/audio/es', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, responseType: 'arraybuffer' });
     fs.writeFileSync(audioPath, audioRes.data);
-
-    // Get Spanish SRT transcript
     console.log('Fetching Spanish subtitles...');
     let hasSrt = false;
     try {
@@ -64,51 +60,46 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         hasSrt = true;
         console.log('Spanish SRT saved!');
       }
-    } catch(e) { console.log('SRT fetch failed, continuing without subtitles:', e.message); }
-
+    } catch(e) { console.log('SRT fetch failed:', e.message); }
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
+    console.log('Step 2: Merging...');
 
-    console.log('Step 2: Merging video + audio + subtitles...');
+    // Step A: blur captions if box provided
+    const blurredPath = 'uploads/blurred_' + timestamp + '.mp4';
+    if (captionBox) {
+      console.log('Applying blur...');
+      const { x, y, w, h } = captionBox;
+      const blurFilter = `[0:v]split[original][forblur];[forblur]crop=iw*${w.toFixed(4)}:ih*${h.toFixed(4)}:iw*${x.toFixed(4)}:ih*${y.toFixed(4)},gblur=sigma=25[blurred];[original][blurred]overlay=W*${x.toFixed(4)}:H*${y.toFixed(4)}[v]`;
+      await new Promise((resolve, reject) => {
+        ffmpeg(videoPath)
+          .outputOptions(['-filter_complex', blurFilter, '-map', '[v]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-threads', '2'])
+          .output(blurredPath)
+          .on('end', resolve)
+          .on('error', reject)
+          .run();
+      });
+      console.log('Blur done!');
+    }
+
+    const sourceVideo = captionBox ? blurredPath : videoPath;
+
+    // Step B: merge audio + burn subtitles
     await new Promise((resolve, reject) => {
-      let cmd = ffmpeg(videoPath).input(audioPath);
-      if (hasSrt) cmd = cmd.input(srtPath);
-
-      let filters = [];
-      let mapV = '0:v';
-
-      if (captionBox) {
-        const { x, y, w, h } = captionBox;
-        filters.push(`[0:v]split[original][forblur];[forblur]crop=iw*${w.toFixed(4)}:ih*${h.toFixed(4)}:iw*${x.toFixed(4)}:ih*${y.toFixed(4)},gblur=sigma=25[blurred];[original][blurred]overlay=W*${x.toFixed(4)}:H*${y.toFixed(4)}[blurred_out]`);
-        mapV = '[blurred_out]';
-      }
-
-      if (hasSrt) {
-        const srtInput = captionBox ? '[blurred_out]' : '[0:v]';
-        const srtInputRef = captionBox ? '' : '[0:v]';
-        filters.push(`${captionBox ? '[blurred_out]' : '[0:v]'}subtitles=${srtPath}:force_style='FontName=Arial,FontSize=14,PrimaryColour=&Hffffff&,OutlineColour=&H000000&,Outline=2,Bold=1,Alignment=2'[final_v]`);
-        mapV = '[final_v]';
-      }
-
+      let cmd = ffmpeg(sourceVideo).input(audioPath);
       const outputOpts = [];
-      if (filters.length > 0) {
-        outputOpts.push('-filter_complex', filters.join(';'));
-        outputOpts.push('-map', mapV);
+      if (hasSrt) {
+        const escapedSrt = srtPath.replace(/:/g, '\\:').replace(/'/g, "\\'");
+        outputOpts.push('-vf', `subtitles=${escapedSrt}:force_style='FontName=Arial,FontSize=16,PrimaryColour=&Hffffff&,OutlineColour=&H000000&,Outline=2,Bold=1,Alignment=2'`);
+        outputOpts.push('-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28');
       } else {
-        outputOpts.push('-map', '0:v');
+        outputOpts.push('-c:v', 'copy');
       }
-      outputOpts.push('-map', '1:a');
-      outputOpts.push('-c:v', 'libx264');
-      outputOpts.push('-preset', 'ultrafast');
-      outputOpts.push('-crf', '28');
-      outputOpts.push('-c:a', 'aac');
-      outputOpts.push('-shortest');
-      outputOpts.push('-threads', '2');
-
+      outputOpts.push('-map', '0:v', '-map', '1:a', '-c:a', 'aac', '-shortest', '-threads', '2');
       cmd.outputOptions(outputOpts).output(outputPath).on('end', resolve).on('error', reject).run();
     });
 
     console.log('Done!');
-    [videoPath, audioPath, srtPath].forEach(f => { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch(e) {} });
+    [videoPath, audioPath, srtPath, blurredPath].forEach(f => { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch(e) {} });
     const token = Date.now().toString();
     app.get('/download/' + token, (req, res) => { res.download(outputPath, 'spanish_dubbed.mp4', () => { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); }); });
     res.json({ success: true, downloadUrl: '/download/' + token });
