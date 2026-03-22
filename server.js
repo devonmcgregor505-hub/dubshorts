@@ -166,7 +166,6 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       init_video: videoUrl,
       source_lang: 'en',
       output_lang: 'es',
-      voice_model: 'kokoro',
       speed: 1.0,
       file_prefix: 'dubbed_'+Date.now(),
       base64: false,
@@ -206,9 +205,19 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     if (captionStyle && captionStyle.enabled) {
       try {
         console.log('Transcribing dubbed video for captions...');
+        // Extract audio from dubbed video to mp3 for STT
+        const dubbedAudioPath = path.resolve('uploads/dubbed_audio_'+timestamp+'.mp3');
+        runFFmpeg(['-y','-i',audioPath,'-vn','-ar','44100','-ac','2','-b:a','128k',dubbedAudioPath], 60000);
+        // Upload audio to tmpfiles for STT
+        const sttForm = new FormData();
+        sttForm.append('file', fs.createReadStream(dubbedAudioPath), { filename: 'dubbed.mp3', contentType: 'audio/mp3' });
+        const sttTmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', sttForm, { headers: sttForm.getHeaders() });
+        const sttAudioUrl = sttTmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+        console.log('STT audio URL:', sttAudioUrl);
+        try { fs.unlinkSync(dubbedAudioPath); } catch(e) {}
         const sttRes = await axios.post('https://modelslab.com/api/v6/voice/speech_to_text', {
           key: process.env.MODELSLAB_API_KEY,
-          init_audio: dubbedVideoUrl,
+          init_audio: sttAudioUrl,
           language: 'es'
         }, { headers: { 'Content-Type': 'application/json' }, timeout: 60000 });
 
