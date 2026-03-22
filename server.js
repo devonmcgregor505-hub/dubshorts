@@ -35,7 +35,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     console.log('Step 2: Removing captions with Replicate...');
     let cleanVideoPath = null;
     try {
-      const prediction = await replicate.predictions.create({ version: '247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d', input: { video: videoUrl, method: 'hybrid', conf_threshold: 0.15, margin: 10 } });
+      const prediction = await replicate.predictions.create({ version: '247c8385f3c6c322110a6787bd2d257acc3a3d60b9ed7da1726a628f72a42c4d', input: { video: videoUrl, method: 'hybrid', conf_threshold: 0.05, margin: 15 } });
       console.log('Prediction created:', prediction.id);
       let completed = await replicate.predictions.get(prediction.id);
       let polls = 0;
