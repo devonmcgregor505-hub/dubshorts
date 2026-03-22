@@ -114,7 +114,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         const assContent = srtToWordAss(srtRes.data);
         fs.writeFileSync(assPath, assContent);
         hasAss = true;
-        console.log('ASS subtitle file created!');
+        console.log('ASS subtitle file created!'); console.log('ASS content preview:', assContent.substring(0, 300));
       }
     } catch(e) { console.log('SRT fetch failed:', e.message); }
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
@@ -133,7 +133,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       let cmd = ffmpeg(sourceVideo).input(audioPath);
       const outputOpts = [];
       if (hasAss) {
-        const escapedAss = assPath.replace(/\\/g, '/').replace(/:/g, '\\:');
+        const escapedAss = assPath.split("/").pop();
         outputOpts.push('-vf', `ass=${escapedAss}`);
         outputOpts.push('-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28');
       } else {
