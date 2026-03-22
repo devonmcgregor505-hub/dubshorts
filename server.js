@@ -20,61 +20,55 @@ app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); }
 
 async function detectCaptionRegion(videoPath, timestamp) {
   const framePath = 'uploads/frame_' + timestamp + '.png';
-  const tsvPath = 'uploads/ocr_' + timestamp;
   try {
-    // Extract single frame from middle of video
     await new Promise((resolve, reject) => {
       ffmpeg(videoPath)
         .screenshots({ timestamps: ['50%'], filename: path.basename(framePath), folder: 'uploads', size: '640x?' })
         .on('end', resolve)
         .on('error', reject);
     });
-    console.log('Frame extracted for OCR');
 
-    // Run Tesseract OCR on the frame
-    execSync(`tesseract ${framePath} ${tsvPath} tsv`, { timeout: 15000 });
-    const tsvData = fs.readFileSync(tsvPath + '.tsv', 'utf8');
-    const lines = tsvData.split('\n').filter(l => l.trim());
+    // Use ffprobe to get frame dimensions
+    const heightInfo = execSync(`ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "${videoPath}"`).toString().trim();
+    const frameHeight = parseInt(heightInfo) || 1080;
 
-    // Find text bounding boxes
-    let minY = Infinity, maxY = -Infinity;
-    let foundText = false;
-    for (const line of lines.slice(1)) {
-      const cols = line.split('\t');
-      if (cols.length < 12) continue;
-      const conf = parseInt(cols[10]);
-      const text = cols[11]?.trim();
-      const y = parseInt(cols[7]);
-      const h = parseInt(cols[8]);
-      if (conf > 50 && text && text.length > 1 && !isNaN(y) && !isNaN(h)) {
-        foundText = true;
-        if (y < minY) minY = y;
-        if (y + h > maxY) maxY = y + h;
-      }
+    // Extract pixel rows and look for bright horizontal bands
+    // Uses ffmpeg to get mean brightness per row slice
+    const slices = 20; // divide video into 20 horizontal slices
+    const sliceHeight = Math.floor(frameHeight / slices);
+    let brightestSlice = 12; // default to lower middle
+    let maxBrightness = 0;
+
+    for (let i = 8; i < 18; i++) { // only check middle portion
+      const y = i * sliceHeight;
+      const h = sliceHeight;
+      try {
+        const result = execSync(
+          `ffmpeg -i "${framePath}" -vf "crop=iw:${h}:0:${y},scale=1:1" -frames:v 1 -f rawvideo -pix_fmt gray - 2>/dev/null | od -An -tu1 | awk '{s+=$1; n++} END {print s/n}'`,
+          { timeout: 5000 }
+        ).toString().trim();
+        const brightness = parseFloat(result);
+        if (brightness > maxBrightness) {
+          maxBrightness = brightness;
+          brightestSlice = i;
+        }
+      } catch(e) {}
     }
 
-    // Get frame dimensions
-    let frameHeight = 1080;
-    try {
-      const info = execSync(`ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 ${videoPath}`).toString().trim();
-      frameHeight = parseInt(info) || 1080;
-    } catch(e) {}
+    const padding = 2; // slices of padding
+    const ySlice = Math.max(0, brightestSlice - padding);
+    const hSlice = padding * 2 + 3;
+    const yPos = (ySlice * sliceHeight) / frameHeight;
+    const hPos = Math.min(1 - yPos, (hSlice * sliceHeight) / frameHeight);
 
-    if (foundText && minY !== Infinity) {
-      const padding = 10;
-      const yPos = Math.max(0, minY - padding) / frameHeight;
-      const hPos = Math.min(frameHeight, maxY - minY + padding * 2) / frameHeight;
-      console.log(`OCR found text: y=${yPos.toFixed(2)}, h=${hPos.toFixed(2)}`);
-      return { y: yPos, h: hPos };
-    } else {
-      console.log('No text detected, using default bottom zone');
-      return { y: 0.72, h: 0.25 };
-    }
+    console.log(`Detected caption region: y=${yPos.toFixed(2)}, h=${hPos.toFixed(2)}, brightness=${maxBrightness.toFixed(1)}`);
+    return { y: yPos, h: hPos };
+
   } catch (err) {
-    console.error('OCR error:', err.message);
-    return { y: 0.72, h: 0.25 };
+    console.error('Detection error:', err.message);
+    return { y: 0.55, h: 0.2 };
   } finally {
-    [framePath, tsvPath + '.tsv'].forEach(f => { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch(e) {} });
+    try { if (fs.existsSync(framePath)) fs.unlinkSync(framePath); } catch(e) {}
   }
 }
 
@@ -87,7 +81,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   try {
     console.log('Step 1: Detecting caption region...');
     const region = await detectCaptionRegion(videoPath, timestamp);
-    console.log('Using blur region:', region);
+    console.log('Caption region:', region);
 
     console.log('Step 2: Sending to ElevenLabs...');
     const form = new FormData();
@@ -115,7 +109,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
 
     console.log('Step 3: Merging + blurring caption region...');
-    const blurFilter = `[0:v]split[original][forblur];[forblur]crop=iw:ih*${region.h.toFixed(3)}:0:ih*${region.y.toFixed(3)},gblur=sigma=20[blurred];[original][blurred]overlay=0:H*${region.y.toFixed(3)}[v]`;
+    const blurFilter = `[0:v]split[original][forblur];[forblur]crop=iw:ih*${region.h.toFixed(3)}:0:ih*${region.y.toFixed(3)},gblur=sigma=25[blurred];[original][blurred]overlay=0:H*${region.y.toFixed(3)}[v]`;
     await new Promise((resolve, reject) => {
       ffmpeg(videoPath)
         .input(audioPath)
