@@ -6,6 +6,7 @@ const FormData = require('form-data');
 const fs = require('fs');
 const cors = require('cors');
 const path = require('path');
+const { execSync } = require('child_process');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegStatic = require('ffmpeg-static');
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -17,19 +18,64 @@ const upload = multer({ dest: 'uploads/' });
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 
-async function detectCaptionRegion(videoPath) {
-  return new Promise((resolve) => {
-    const tmpFrame = videoPath + '_frame.png';
-    ffmpeg(videoPath)
-      .screenshots({ timestamps: ['50%'], filename: path.basename(tmpFrame), folder: path.dirname(tmpFrame), size: '?x360' })
-      .on('end', () => {
-        // Analyze frame for bright horizontal bands (caption regions)
-        // Default to bottom 25% if detection fails
-        if (fs.existsSync(tmpFrame)) fs.unlinkSync(tmpFrame);
-        resolve({ y: 0.72, h: 0.25 }); // bottom zone default
-      })
-      .on('error', () => resolve({ y: 0.72, h: 0.25 }));
-  });
+async function detectCaptionRegion(videoPath, timestamp) {
+  const framePath = 'uploads/frame_' + timestamp + '.png';
+  const tsvPath = 'uploads/ocr_' + timestamp;
+  try {
+    // Extract single frame from middle of video
+    await new Promise((resolve, reject) => {
+      ffmpeg(videoPath)
+        .screenshots({ timestamps: ['50%'], filename: path.basename(framePath), folder: 'uploads', size: '640x?' })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+    console.log('Frame extracted for OCR');
+
+    // Run Tesseract OCR on the frame
+    execSync(`tesseract ${framePath} ${tsvPath} tsv`, { timeout: 15000 });
+    const tsvData = fs.readFileSync(tsvPath + '.tsv', 'utf8');
+    const lines = tsvData.split('\n').filter(l => l.trim());
+
+    // Find text bounding boxes
+    let minY = Infinity, maxY = -Infinity;
+    let foundText = false;
+    for (const line of lines.slice(1)) {
+      const cols = line.split('\t');
+      if (cols.length < 12) continue;
+      const conf = parseInt(cols[10]);
+      const text = cols[11]?.trim();
+      const y = parseInt(cols[7]);
+      const h = parseInt(cols[8]);
+      if (conf > 50 && text && text.length > 1 && !isNaN(y) && !isNaN(h)) {
+        foundText = true;
+        if (y < minY) minY = y;
+        if (y + h > maxY) maxY = y + h;
+      }
+    }
+
+    // Get frame dimensions
+    let frameHeight = 1080;
+    try {
+      const info = execSync(`ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 ${videoPath}`).toString().trim();
+      frameHeight = parseInt(info) || 1080;
+    } catch(e) {}
+
+    if (foundText && minY !== Infinity) {
+      const padding = 10;
+      const yPos = Math.max(0, minY - padding) / frameHeight;
+      const hPos = Math.min(frameHeight, maxY - minY + padding * 2) / frameHeight;
+      console.log(`OCR found text: y=${yPos.toFixed(2)}, h=${hPos.toFixed(2)}`);
+      return { y: yPos, h: hPos };
+    } else {
+      console.log('No text detected, using default bottom zone');
+      return { y: 0.72, h: 0.25 };
+    }
+  } catch (err) {
+    console.error('OCR error:', err.message);
+    return { y: 0.72, h: 0.25 };
+  } finally {
+    [framePath, tsvPath + '.tsv'].forEach(f => { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch(e) {} });
+  }
 }
 
 app.post('/translate', upload.single('video'), async (req, res) => {
@@ -39,7 +85,11 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   const outputPath = 'uploads/final_' + timestamp + '.mp4';
   console.log('File received:', req.file.originalname);
   try {
-    console.log('Step 1: Sending to ElevenLabs...');
+    console.log('Step 1: Detecting caption region...');
+    const region = await detectCaptionRegion(videoPath, timestamp);
+    console.log('Using blur region:', region);
+
+    console.log('Step 2: Sending to ElevenLabs...');
     const form = new FormData();
     form.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: 'video/mp4' });
     form.append('source_lang', 'en');
@@ -63,10 +113,9 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const audioRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/audio/es', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, responseType: 'arraybuffer' });
     fs.writeFileSync(audioPath, audioRes.data);
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
-    console.log('Step 2: Merging + blurring captions...');
-    const region = await detectCaptionRegion(videoPath);
-    console.log('Caption region detected:', region);
-    const blurFilter = `[0:v]split[original][forblur];[forblur]crop=iw:ih*${region.h}:0:ih*${region.y},gblur=sigma=20[blurred];[original][blurred]overlay=0:H*${region.y}[v]`;
+
+    console.log('Step 3: Merging + blurring caption region...');
+    const blurFilter = `[0:v]split[original][forblur];[forblur]crop=iw:ih*${region.h.toFixed(3)}:0:ih*${region.y.toFixed(3)},gblur=sigma=20[blurred];[original][blurred]overlay=0:H*${region.y.toFixed(3)}[v]`;
     await new Promise((resolve, reject) => {
       ffmpeg(videoPath)
         .input(audioPath)
