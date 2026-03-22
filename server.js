@@ -19,23 +19,11 @@ app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); }
 app.post('/translate', upload.single('video'), async (req, res) => {
   const videoPath = req.file.path;
   const timestamp = Date.now();
-  const cleanPath = 'uploads/clean_' + timestamp + '.mp4';
   const audioPath = 'uploads/spanish_' + timestamp + '.mp3';
   const outputPath = 'uploads/final_' + timestamp + '.mp4';
   console.log('File received:', req.file.originalname);
   try {
-    console.log('Step 1: Blurring captions with FFmpeg...');
-    await new Promise((resolve, reject) => {
-      ffmpeg(videoPath)
-        .complexFilter('[0:v]crop=iw:ih*0.3:0:ih*0.65,boxblur=30:5[blurred];[0:v][blurred]overlay=0:H*0.65[v]')
-        .outputOptions(['-map', '[v]', '-map', '0:a', '-c:a', 'copy', '-preset', 'fast'])
-        .output(cleanPath)
-        .on('end', resolve)
-        .on('error', (err) => { console.error('FFmpeg blur error:', err.message); reject(err); })
-        .run();
-    });
-    console.log('Blur done!');
-    console.log('Step 2: Sending to ElevenLabs...');
+    console.log('Step 1: Sending to ElevenLabs...');
     const form = new FormData();
     form.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: 'video/mp4' });
     form.append('source_lang', 'en');
@@ -59,19 +47,19 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const audioRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/audio/es', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, responseType: 'arraybuffer' });
     fs.writeFileSync(audioPath, audioRes.data);
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
-    console.log('Step 3: Merging blurred video + Spanish audio...');
+    console.log('Step 2: Merging video + Spanish audio...');
     await new Promise((resolve, reject) => {
-      ffmpeg(cleanPath).input(audioPath).outputOptions(['-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
+      ffmpeg(videoPath).input(audioPath).outputOptions(['-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
     });
     console.log('Done!');
-    [videoPath, cleanPath, audioPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
+    [videoPath, audioPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
     const token = Date.now().toString();
     app.get('/download/' + token, (req, res) => { res.download(outputPath, 'spanish_dubbed.mp4', () => { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); }); });
     res.json({ success: true, downloadUrl: '/download/' + token });
   } catch (err) {
     console.error('Error:', err.message);
     if (err.response) console.error('API error:', JSON.stringify(err.response.data));
-    [videoPath, cleanPath, audioPath, outputPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
+    [videoPath, audioPath, outputPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
     res.status(500).json({ success: false, error: err.message });
   }
 });
