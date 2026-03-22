@@ -108,7 +108,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       const dim = (probe.stderr||'').match(/(\d{3,4})x(\d{3,4})/);
       const fpsM = (probe.stderr||'').match(/(\d+(?:\.\d+)?) fps/);
       if (dim) { vidW=parseInt(dim[1]); vidH=parseInt(dim[2]); }
-      if (fpsM) fps=parseFloat(fpsM[1]);
+      if (fpsM) fps=Math.min(parseFloat(fpsM[1]), 24);
       console.log('Video:', vidW, 'x', vidH, '@', fps, 'fps');
     } catch(e) {}
 
@@ -162,7 +162,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       console.log('Burning captions on frames...');
       await burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps);
       console.log('Reassembling...');
-      runFFmpeg(['-y','-framerate',String(fps),'-i',path.join(framesDir,'frame%06d.jpg'),'-c:v','libx264','-preset','fast','-crf','23','-pix_fmt','yuv420p',captionedPath], 300000);
+      runFFmpeg(['-y','-framerate',String(fps),'-i',path.join(framesDir,'frame%06d.jpg'),'-c:v','libx264','-preset','ultrafast','-crf','28','-pix_fmt','yuv420p','-threads','1',captionedPath], 300000);
       fs.readdirSync(framesDir).forEach(f=>fs.unlinkSync(path.join(framesDir,f)));
       fs.rmdirSync(framesDir);
       videoForMerge = captionedPath;
