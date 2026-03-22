@@ -47,22 +47,9 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const audioRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/audio/es', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, responseType: 'arraybuffer' });
     fs.writeFileSync(audioPath, audioRes.data);
     await axios.delete('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY } }).catch(() => {});
-    console.log('Step 2: Covering captions + merging Spanish audio...');
+    console.log('Step 2: Merging video + Spanish audio...');
     await new Promise((resolve, reject) => {
-      ffmpeg(videoPath)
-        .input(audioPath)
-        .outputOptions([
-          '-filter_complex', '[0:v]drawbox=x=0:y=ih*0.7:w=iw:h=ih*0.3:color=black:t=fill[v]',
-          '-map', '[v]',
-          '-map', '1:a',
-          '-c:a', 'aac',
-          '-shortest',
-          '-threads', '1'
-        ])
-        .output(outputPath)
-        .on('end', resolve)
-        .on('error', reject)
-        .run();
+      ffmpeg(videoPath).input(audioPath).outputOptions(['-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-shortest']).output(outputPath).on('end', resolve).on('error', reject).run();
     });
     console.log('Done!');
     [videoPath, audioPath].forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
