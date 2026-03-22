@@ -133,7 +133,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     }
     if (hasAss) {
       console.log('Burning subtitles...');
-      runFFmpeg(['-y', '-i', videoForMerge, '-vf', `ass=${assPath}`, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-threads', '2', subtitledPath]);
+      runFFmpeg(['-y', '-i', videoForMerge, '-vf', `subtitles=:force_style='FontName=Arial,FontSize=24,PrimaryColour=&H00ffffff,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=0,Bold=1,Alignment=2'`, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-threads', '2', subtitledPath]);
       videoForMerge = subtitledPath;
       console.log('Subtitles burned!');
     }
