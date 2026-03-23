@@ -330,7 +330,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
 
       console.log('Reassembling cleaned video...');
-      runFFmpeg(['-y', '-framerate', String(fps), '-i', path.join(framesForRemoval, 'frame%06d.jpg'),
+      runFFmpeg(['-y', '-framerate', String(fps), '-start_number', '1', '-i', path.join(framesForRemoval, 'frame%06d.jpg'),
         '-i', videoPath, '-map', '0:v', '-map', '1:a?', '-c:v', 'libx264', '-preset', 'ultrafast',
         '-crf', '28', '-pix_fmt', 'yuv420p', '-shortest', blurredPath], 300000);
       try { fs.readdirSync(framesForRemoval).forEach(f => fs.unlinkSync(path.join(framesForRemoval, f))); fs.rmdirSync(framesForRemoval); } catch(e) {}
