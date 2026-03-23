@@ -266,7 +266,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
       // Send just ONE frame to PixLab, use clean patch on all frames
       const singleFramePath = path.join(framesForRemoval, 'sample.jpg');
-      runFFmpeg(['-y','-i',videoPath,'-vf','select=eq(n\,30)','-vframes','1','-q:v','2',singleFramePath], 60000);
+      runFFmpeg(['-y','-i',videoPath,'-ss','00:00:01','-vframes','1','-q:v','2',singleFramePath], 60000);
 
       console.log('Sending one frame to PixLab...');
       const sampleImg = await loadImage(singleFramePath);
