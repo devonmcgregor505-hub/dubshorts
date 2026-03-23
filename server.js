@@ -173,7 +173,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       track_id: null
     }, { headers: { 'Content-Type': 'application/json' }, timeout: 30000 });
 
-    console.log('ModelsLab response:', JSON.stringify(dubRes.data).slice(0, 200));
+    console.log('ModelsLab FULL response:', JSON.stringify(dubRes.data).slice(0, 500));
 
     let dubbedVideoUrl = null;
     if (dubRes.data.status === 'success' && dubRes.data.output && dubRes.data.output[0]) {
