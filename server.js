@@ -260,7 +260,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
     if (removeCaption) {
       console.log('WaveSpeed AI caption removal...');
-      const { x, y, w, h } = captionBox;
+      // WaveSpeed processes full video - no box needed
 
       // Upload video to WaveSpeed
       console.log('Uploading video to WaveSpeed...');
