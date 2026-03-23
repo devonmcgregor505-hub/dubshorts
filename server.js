@@ -260,49 +260,64 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
     if (captionBox) {
       console.log('PixLab AI caption removal...');
-      const {x,y,w,h} = captionBox;
-      const framesForRemoval = path.resolve('uploads/removal_frames_'+timestamp);
+      const { x, y, w, h } = captionBox;
+      const framesForRemoval = path.resolve('uploads/removal_frames_' + timestamp);
       fs.mkdirSync(framesForRemoval, { recursive: true });
 
-      // Send just ONE frame to PixLab, use clean patch on all frames
-      const singleFramePath = path.join(framesForRemoval, 'sample.jpg');
-      runFFmpeg(['-y','-i',videoPath,'-ss','00:00:01','-vframes','1','-q:v','2',singleFramePath], 60000);
-
-      console.log('Sending one frame to PixLab...');
-      const sampleImg = await loadImage(singleFramePath);
-      const fullW = sampleImg.width, fullH = sampleImg.height;
+      const fullW = vidW, fullH = vidH;
       const bx = Math.round(x * fullW), by = Math.round(y * fullH);
       const bw = Math.round(w * fullW), bh = Math.round(h * fullH);
 
-      const regionCanvas = createCanvas(bw, bh);
-      const rCtx = regionCanvas.getContext('2d');
-      rCtx.drawImage(sampleImg, bx, by, bw, bh, 0, 0, bw, bh);
-      const regionBuffer = regionCanvas.toBuffer('image/jpeg', { quality: 0.95 });
+      // Get video duration
+      const probeR = spawnSync(FFMPEG_PATH, ['-i', videoPath], { encoding: 'utf8' });
+      const durM = (probeR.stderr || '').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
+      const totalDur = durM ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3]) : 10;
 
-      const plForm = new FormData();
-      plForm.append('file', regionBuffer, { filename: 'region.jpg', contentType: 'image/jpeg' });
-      plForm.append('key', process.env.PIXLAB_API_KEY);
-      const plRes = await axios.post('https://api.pixlab.io/txtremove', plForm, {
-        headers: plForm.getHeaders(), timeout: 30000
-      });
+      // Sample a frame every 0.5 seconds and get clean patches
+      const sampleInterval = 0.5;
+      const numSamples = Math.max(1, Math.ceil(totalDur / sampleInterval));
+      console.log(`Getting ${numSamples} clean patches from PixLab...`);
 
-      if (!plRes.data || plRes.data.status !== 200 || !plRes.data.imgData) {
-        throw new Error('PixLab failed: ' + JSON.stringify(plRes.data));
+      const cleanPatches = [];
+      for (let s = 0; s < numSamples; s++) {
+        const ts = Math.min(s * sampleInterval, totalDur - 0.1).toFixed(2);
+        const samplePath = path.join(framesForRemoval, `smp_${s}.jpg`);
+        try {
+          runFFmpeg(['-y', '-i', videoPath, '-ss', String(ts), '-vframes', '1', '-q:v', '2', samplePath], 30000);
+          const sImg = await loadImage(samplePath);
+          const rc = createCanvas(bw, bh);
+          rc.getContext('2d').drawImage(sImg, bx, by, bw, bh, 0, 0, bw, bh);
+          const rb = rc.toBuffer('image/jpeg', { quality: 0.95 });
+          rc.width = 0; rc.height = 0;
+          const pf = new FormData();
+          pf.append('file', rb, { filename: 'r.jpg', contentType: 'image/jpeg' });
+          pf.append('key', process.env.PIXLAB_API_KEY);
+          const pr = await axios.post('https://api.pixlab.io/txtremove', pf, { headers: pf.getHeaders(), timeout: 30000 });
+          if (pr.data && pr.data.status === 200 && pr.data.imgData) {
+            const cp = await loadImage(Buffer.from(pr.data.imgData, 'base64'));
+            cleanPatches.push({ time: parseFloat(ts), patch: cp });
+            console.log(`Patch ${s + 1}/${numSamples} ready at ${ts}s`);
+          }
+          try { fs.unlinkSync(samplePath); } catch(e) {}
+        } catch(e) { console.log(`Sample ${s} error:`, e.message); }
+        await new Promise(r => setTimeout(r, 300));
       }
 
-      const cleanBuffer = Buffer.from(plRes.data.imgData, 'base64');
-      const cleanPatch = await loadImage(cleanBuffer);
-      console.log('Got clean patch, applying to all frames...');
+      if (cleanPatches.length === 0) throw new Error('No clean patches from PixLab');
+      console.log(`Got ${cleanPatches.length} patches, extracting all frames...`);
 
-      runFFmpeg(['-y','-i',videoPath,'-vf',`fps=${fps}`,'-q:v','2',path.join(framesForRemoval,'frame%06d.jpg')], 300000);
-      const removalFrames = fs.readdirSync(framesForRemoval).filter(f=>f.endsWith('.jpg')&&f.startsWith('frame')).sort();
+      // Extract all frames at original fps
+      runFFmpeg(['-y', '-i', videoPath, '-vf', `fps=${fps}`, '-q:v', '2', path.join(framesForRemoval, 'frame%06d.jpg')], 300000);
+      const removalFrames = fs.readdirSync(framesForRemoval).filter(f => f.startsWith('frame') && f.endsWith('.jpg')).sort();
       console.log(`Patching ${removalFrames.length} frames...`);
 
       for (let i = 0; i < removalFrames.length; i++) {
         const framePath = path.join(framesForRemoval, removalFrames[i]);
         try {
           const frameTime = i / fps;
-          const nearest = cleanPatches.reduce((a,b) => Math.abs(b.time-frameTime) < Math.abs(a.time-frameTime) ? b : a);
+          const nearest = cleanPatches.reduce((a, b) =>
+            Math.abs(b.time - frameTime) < Math.abs(a.time - frameTime) ? b : a
+          );
           const img = await loadImage(framePath);
           const canvas = createCanvas(fullW, fullH);
           const ctx = canvas.getContext('2d');
@@ -311,13 +326,14 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           fs.writeFileSync(framePath, canvas.toBuffer('image/jpeg', { quality: 0.85 }));
           canvas.width = 0; canvas.height = 0;
         } catch(e) { console.log('Frame paste error:', e.message); }
-        if (i % 10 === 0) { console.log(`Patched ${i}/${removalFrames.length}`); await new Promise(r=>setTimeout(r,10)); }
+        if (i % 30 === 0) { console.log(`Patched ${i}/${removalFrames.length}`); await new Promise(r => setTimeout(r, 5)); }
       }
 
-      runFFmpeg(['-y','-framerate',String(fps),'-i',path.join(framesForRemoval,'seq_%06d.jpg'),
-        '-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast',
-        '-crf','28','-pix_fmt','yuv420p','-shortest',blurredPath], 300000);
-      try { fs.readdirSync(framesForRemoval).forEach(f=>fs.unlinkSync(path.join(framesForRemoval,f))); fs.rmdirSync(framesForRemoval); } catch(e){}
+      console.log('Reassembling cleaned video...');
+      runFFmpeg(['-y', '-framerate', String(fps), '-i', path.join(framesForRemoval, 'frame%06d.jpg'),
+        '-i', videoPath, '-map', '0:v', '-map', '1:a?', '-c:v', 'libx264', '-preset', 'ultrafast',
+        '-crf', '28', '-pix_fmt', 'yuv420p', '-shortest', blurredPath], 300000);
+      try { fs.readdirSync(framesForRemoval).forEach(f => fs.unlinkSync(path.join(framesForRemoval, f))); fs.rmdirSync(framesForRemoval); } catch(e) {}
       videoForMerge = blurredPath;
       console.log('PixLab removal done!');
       console.log('Blur done!');
