@@ -137,8 +137,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   const allFiles = [videoPath, audioPath, blurredPath, captionedPath];
   console.log('File received:', req.file.originalname);
 
-  let captionBox = null;
-  if (req.body.captionBox) { try { captionBox = JSON.parse(req.body.captionBox); } catch(e) {} }
+  const removeCaption = req.body.removeCaption === 'true';
   let captionStyle = null;
   if (req.body.captionStyle) { try { captionStyle = JSON.parse(req.body.captionStyle); } catch(e) {} }
 
@@ -259,7 +258,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
     let videoForMerge = audioPath; // audioPath now holds the complete dubbed video from ModelsLab
 
-    if (captionBox) {
+    if (removeCaption) {
       console.log('WaveSpeed AI caption removal...');
       const { x, y, w, h } = captionBox;
 

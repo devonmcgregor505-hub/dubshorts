@@ -135,11 +135,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
   object-fit:cover;
   display:none;
 }
-#selCanvas{
-  position:absolute;inset:0;
-  width:100%;height:100%;
-  pointer-events:none;
-}
+#selCanvas{display:none;}
 
 .hint-bar{
   width:100%;
@@ -208,7 +204,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
           <div class="tc-ic">🗑</div>
           <div class="tc-info">
             <div class="tc-title">Remove Captions</div>
-            <div class="tc-desc">Blur English text</div>
+            <div class="tc-desc">AI removes English text</div>
           </div>
           <label class="tog" onclick="event.stopPropagation()">
             <input type="checkbox" id="removeToggle" onchange="onRemove()">
@@ -236,7 +232,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
         <div class="ypos-row">
           <div class="ypos-lbl"><span>Vertical Position</span><span id="yposVal">75%</span></div>
-          <input type="range" id="yPos" min="5" max="95" value="70" step="1" style="width:100%;accent-color:var(--y);" oninput="onYPos()">
+          <input type="range" id="yPos" min="5" max="95" value="75" step="1" style="width:100%;accent-color:var(--y);" oninput="onYPos()">
           <div class="ypos-marks"><span>Top</span><span>Center</span><span>Bottom</span></div>
         </div>
 
@@ -246,7 +242,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
             <select id="fontFamily" onchange="drawOverlay()">
               <option value="CaptionFont">DejaVu Bold</option>
               <option value="serif">Serif</option>
-              <option value="sans-serif" selected>Sans-serif</option>
+              <option value="sans-serif">Sans-serif</option>
               <option value="monospace">Monospace</option>
             </select>
           </div>
@@ -272,7 +268,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
         <div class="sg2">
           <div class="sfi">
             <label>Size <span class="rv" id="sizeVal">5%</span></label>
-            <div class="rr"><input type="range" id="fontSize" min="2" max="12" value="4" step=".5" oninput="document.getElementById('sizeVal').textContent=this.value+'%';drawOverlay()"></div>
+            <div class="rr"><input type="range" id="fontSize" min="2" max="12" value="5" step=".5" oninput="document.getElementById('sizeVal').textContent=this.value+'%';drawOverlay()"></div>
           </div>
           <div class="sfi">
             <label>Outline <span class="rv" id="outlineVal">15%</span></label>
@@ -342,7 +338,7 @@ const ctx = selCanvas.getContext('2d');
 const previewVideo = document.getElementById('previewVideo');
 const phoneWrap = document.getElementById('phoneWrap');
 let captionBox = null, isDrawing = false, sx = 0, sy = 0;
-let captionYPct = 70;
+let captionYPct = 75;
 let progInterval = null;
 
 function fitCanvas() {
@@ -386,15 +382,15 @@ function updateHint() {
   const add = document.getElementById('addToggle').checked;
   const h = document.getElementById('hintTxt');
   if (!fileInput.files[0]) { h.textContent = 'Upload a video to preview'; return; }
-  if (rem && add) h.textContent = 'Draw a box to blur captions · Preview shows Spanish caption position';
-  else if (rem) h.textContent = 'Scrub to a frame with captions, then draw a box over them';
-  else if (add) h.textContent = 'Preview shows where Spanish captions will appear — adjust position above';
+  if (rem && add) h.textContent = 'AI will remove English captions · Spanish captions will be added';
+  else if (rem) h.textContent = 'AI will automatically detect and remove captions from your video';
+  else if (add) h.textContent = 'Preview shows where Spanish captions will appear — adjust in style panel';
   else h.textContent = 'Enable an option to get started';
 }
 
 function onYPos() {
   captionYPct = parseInt(document.getElementById('yPos').value);
-  document.getElementById("yposVal").textContent = captionYPct + '%';
+  document.getElementById('yposVal').textContent = captionYPct + '%';
   drawOverlay();
 }
 
@@ -520,7 +516,7 @@ async function startTranslation(){
   hide('doneBox');hide('errBox');startProg(90000);
   const fd=new FormData();
   fd.append('video',f);
-  if(document.getElementById('removeToggle').checked&&captionBox)fd.append('captionBox',JSON.stringify(captionBox));
+  if(document.getElementById('removeToggle').checked) fd.append('removeCaption','true');
   fd.append('captionStyle',JSON.stringify(getStyle()));
   try{
     const res=await fetch('/translate',{method:'POST',body:fd});
