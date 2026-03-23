@@ -330,15 +330,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
 
       console.log('Reassembling cleaned video...');
-      // Use concat demuxer for reliable reassembly
-      const concatFile = path.join(framesForRemoval, 'concat.txt');
-      const frameFiles = fs.readdirSync(framesForRemoval).filter(f=>f.startsWith('frame')&&f.endsWith('.jpg')).sort();
-      fs.writeFileSync(concatFile, frameFiles.map(f=>`file '${path.join(framesForRemoval,f)}'
-duration ${(1/fps).toFixed(6)}`).join('
-'));
-      runFFmpeg(['-y','-f','concat','-safe','0','-i',concatFile,
-        '-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast',
-        '-crf','28','-pix_fmt','yuv420p','-shortest',blurredPath], 300000);
+      // Reassemble using framerate input
+      runFFmpeg(['-y', '-framerate', String(fps), '-i', path.join(framesForRemoval, 'frame%06d.jpg'),
+        '-i', videoPath, '-map', '0:v', '-map', '1:a?', '-c:v', 'libx264', '-preset', 'ultrafast',
+        '-crf', '28', '-pix_fmt', 'yuv420p', '-r', String(fps), '-shortest', blurredPath], 300000);
       try { fs.readdirSync(framesForRemoval).forEach(f => fs.unlinkSync(path.join(framesForRemoval, f))); fs.rmdirSync(framesForRemoval); } catch(e) {}
       videoForMerge = blurredPath;
       console.log('PixLab removal done!');
