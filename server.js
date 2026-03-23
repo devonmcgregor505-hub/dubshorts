@@ -274,14 +274,13 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       const durM = (probeR.stderr || '').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
       const totalDur = durM ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3]) : 10;
 
-      // Sample a frame every 0.5 seconds and get clean patches
-      const sampleInterval = 0.5;
-      const numSamples = Math.max(1, Math.ceil(totalDur / sampleInterval));
-      console.log(`Getting ${numSamples} clean patches from PixLab...`);
+      // Just use 1 sample - free tier friendly
+      const numSamples = 1;
+      console.log('Getting 1 clean patch from PixLab...');
 
       const cleanPatches = [];
       for (let s = 0; s < numSamples; s++) {
-        const ts = Math.min(s * sampleInterval, totalDur - 0.1).toFixed(2);
+        const ts = (totalDur * 0.3).toFixed(2); // 30% into video for best sample
         const samplePath = path.join(framesForRemoval, `smp_${s}.jpg`);
         try {
           runFFmpeg(['-y', '-i', videoPath, '-ss', String(ts), '-vframes', '1', '-q:v', '2', samplePath], 30000);
@@ -331,9 +330,15 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
 
       console.log('Reassembling cleaned video...');
-      runFFmpeg(['-y', '-framerate', String(fps), '-start_number', '1', '-i', path.join(framesForRemoval, 'frame%06d.jpg'),
-        '-i', videoPath, '-map', '0:v', '-map', '1:a?', '-c:v', 'libx264', '-preset', 'ultrafast',
-        '-crf', '28', '-pix_fmt', 'yuv420p', '-shortest', blurredPath], 300000);
+      // Use concat demuxer for reliable reassembly
+      const concatFile = path.join(framesForRemoval, 'concat.txt');
+      const frameFiles = fs.readdirSync(framesForRemoval).filter(f=>f.startsWith('frame')&&f.endsWith('.jpg')).sort();
+      fs.writeFileSync(concatFile, frameFiles.map(f=>`file '${path.join(framesForRemoval,f)}'
+duration ${(1/fps).toFixed(6)}`).join('
+'));
+      runFFmpeg(['-y','-f','concat','-safe','0','-i',concatFile,
+        '-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast',
+        '-crf','28','-pix_fmt','yuv420p','-shortest',blurredPath], 300000);
       try { fs.readdirSync(framesForRemoval).forEach(f => fs.unlinkSync(path.join(framesForRemoval, f))); fs.rmdirSync(framesForRemoval); } catch(e) {}
       videoForMerge = blurredPath;
       console.log('PixLab removal done!');
