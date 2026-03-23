@@ -260,83 +260,56 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     let videoForMerge = audioPath; // audioPath now holds the complete dubbed video from ModelsLab
 
     if (captionBox) {
-      console.log('PixLab AI caption removal...');
+      console.log('WaveSpeed AI caption removal...');
       const { x, y, w, h } = captionBox;
-      const framesForRemoval = path.resolve('uploads/removal_frames_' + timestamp);
-      fs.mkdirSync(framesForRemoval, { recursive: true });
 
-      const fullW = vidW, fullH = vidH;
-      const bx = Math.round(x * fullW), by = Math.round(y * fullH);
-      const bw = Math.round(w * fullW), bh = Math.round(h * fullH);
+      // Upload video to WaveSpeed
+      console.log('Uploading video to WaveSpeed...');
+      const wsUploadForm = new FormData();
+      wsUploadForm.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: 'video/mp4' });
+      const wsUploadRes = await axios.post('https://api.wavespeed.ai/api/v3/media/upload/binary', wsUploadForm, {
+        headers: { ...wsUploadForm.getHeaders(), 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
+        timeout: 120000
+      });
+      const wsVideoUrl = wsUploadRes.data.data.download_url;
+      console.log('WaveSpeed video URL:', wsVideoUrl);
 
-      // Get video duration
-      const probeR = spawnSync(FFMPEG_PATH, ['-i', videoPath], { encoding: 'utf8' });
-      const durM = (probeR.stderr || '').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
-      const totalDur = durM ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3]) : 10;
+      // Submit watermark removal job
+      console.log('Submitting WaveSpeed removal job...');
+      const wsJobRes = await axios.post('https://api.wavespeed.ai/api/v3/wavespeed-ai/video-watermark-remover', {
+        video: wsVideoUrl
+      }, {
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
+        timeout: 30000
+      });
+      const wsJobId = wsJobRes.data.id;
+      console.log('WaveSpeed job ID:', wsJobId);
 
-      // Just use 1 sample - free tier friendly
-      const numSamples = 1;
-      console.log('Getting 1 clean patch from PixLab...');
-
-      const cleanPatches = [];
-      for (let s = 0; s < numSamples; s++) {
-        const ts = (totalDur * 0.3).toFixed(2); // 30% into video for best sample
-        const samplePath = path.join(framesForRemoval, `smp_${s}.jpg`);
-        try {
-          runFFmpeg(['-y', '-i', videoPath, '-ss', String(ts), '-vframes', '1', '-q:v', '2', samplePath], 30000);
-          const sImg = await loadImage(samplePath);
-          const rc = createCanvas(bw, bh);
-          rc.getContext('2d').drawImage(sImg, bx, by, bw, bh, 0, 0, bw, bh);
-          const rb = rc.toBuffer('image/jpeg', { quality: 0.95 });
-          rc.width = 0; rc.height = 0;
-          const pf = new FormData();
-          pf.append('file', rb, { filename: 'r.jpg', contentType: 'image/jpeg' });
-          pf.append('key', process.env.PIXLAB_API_KEY);
-          const pr = await axios.post('https://api.pixlab.io/txtremove', pf, { headers: pf.getHeaders(), timeout: 30000 });
-          if (pr.data && pr.data.status === 200 && pr.data.imgData) {
-            const cp = await loadImage(Buffer.from(pr.data.imgData, 'base64'));
-            cleanPatches.push({ time: parseFloat(ts), patch: cp });
-            console.log(`Patch ${s + 1}/${numSamples} ready at ${ts}s`);
-          }
-          try { fs.unlinkSync(samplePath); } catch(e) {}
-        } catch(e) { console.log(`Sample ${s} error:`, e.message); }
-        await new Promise(r => setTimeout(r, 300));
+      // Poll for result
+      let wsResult = null;
+      for (let attempt = 0; attempt < 60; attempt++) {
+        await new Promise(r => setTimeout(r, 5000));
+        const wsCheck = await axios.get(`https://api.wavespeed.ai/api/v3/predictions/${wsJobId}/result`, {
+          headers: { 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
+          timeout: 15000
+        });
+        console.log(`WaveSpeed poll ${attempt + 1}: ${wsCheck.data.status}`);
+        if (wsCheck.data.status === 'completed' && wsCheck.data.outputs && wsCheck.data.outputs[0]) {
+          wsResult = wsCheck.data.outputs[0];
+          break;
+        } else if (wsCheck.data.status === 'failed') {
+          throw new Error('WaveSpeed removal failed: ' + wsCheck.data.error);
+        }
       }
 
-      if (cleanPatches.length === 0) throw new Error('No clean patches from PixLab');
-      console.log(`Got ${cleanPatches.length} patches, extracting all frames...`);
+      if (!wsResult) throw new Error('WaveSpeed timed out');
+      console.log('WaveSpeed removal complete! Downloading...');
 
-      // Extract all frames at original fps
-      runFFmpeg(['-y', '-i', videoPath, '-vf', `fps=${fps}`, '-q:v', '2', path.join(framesForRemoval, 'frame%06d.jpg')], 300000);
-      const removalFrames = fs.readdirSync(framesForRemoval).filter(f => f.startsWith('frame') && f.endsWith('.jpg')).sort();
-      console.log(`Patching ${removalFrames.length} frames...`);
-
-      for (let i = 0; i < removalFrames.length; i++) {
-        const framePath = path.join(framesForRemoval, removalFrames[i]);
-        try {
-          const frameTime = i / fps;
-          const nearest = cleanPatches.reduce((a, b) =>
-            Math.abs(b.time - frameTime) < Math.abs(a.time - frameTime) ? b : a
-          );
-          const img = await loadImage(framePath);
-          const canvas = createCanvas(fullW, fullH);
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-          ctx.drawImage(nearest.patch, bx, by, bw, bh);
-          fs.writeFileSync(framePath, canvas.toBuffer('image/jpeg', { quality: 0.85 }));
-          canvas.width = 0; canvas.height = 0;
-        } catch(e) { console.log('Frame paste error:', e.message); }
-        if (i % 30 === 0) { console.log(`Patched ${i}/${removalFrames.length}`); await new Promise(r => setTimeout(r, 5)); }
-      }
-
-      console.log('Reassembling cleaned video...');
-      // Reassemble using framerate input
-      runFFmpeg(['-y', '-framerate', String(fps), '-i', path.join(framesForRemoval, 'frame%06d.jpg'),
-        '-i', videoPath, '-map', '0:v', '-map', '1:a?', '-c:v', 'libx264', '-preset', 'ultrafast',
-        '-crf', '28', '-pix_fmt', 'yuv420p', '-r', String(fps), '-shortest', blurredPath], 300000);
-      try { fs.readdirSync(framesForRemoval).forEach(f => fs.unlinkSync(path.join(framesForRemoval, f))); fs.rmdirSync(framesForRemoval); } catch(e) {}
+      // Download cleaned video
+      const wsVideoRes = await axios.get(wsResult, { responseType: 'arraybuffer', timeout: 120000 });
+      fs.writeFileSync(blurredPath, wsVideoRes.data);
       videoForMerge = blurredPath;
-      console.log('PixLab removal done!');
+      console.log('WaveSpeed removal done!');
       console.log('Blur done!');
     }
 
