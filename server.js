@@ -305,6 +305,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           }
         } catch(e) { console.log('PixLab frame error:', e.message); }
         if (i % 10 === 0) console.log(`PixLab: ${i}/${removalFrames.length} frames done`);
+        await new Promise(r => setTimeout(r, 200)); // avoid rate limiting
       }
 
       // Reassemble cleaned video
