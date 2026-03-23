@@ -265,7 +265,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       fs.mkdirSync(framesForRemoval, { recursive: true });
 
       // Extract frames at 10fps to keep cost down
-      runFFmpeg(['-y','-i',videoPath,'-vf','fps=10','-q:v','2',path.join(framesForRemoval,'frame%06d.jpg')], 300000);
+      runFFmpeg(['-y','-i',videoPath,'-vf','fps=5','-q:v','2',path.join(framesForRemoval,'frame%06d.jpg')], 300000);
 
       const removalFrames = fs.readdirSync(framesForRemoval).filter(f=>f.endsWith('.jpg')).sort();
       console.log(`Processing ${removalFrames.length} frames with PixLab...`);
@@ -310,7 +310,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
       // Reassemble cleaned video
       console.log('Reassembling cleaned video...');
-      runFFmpeg(['-y','-framerate','10','-i',path.join(framesForRemoval,'frame%06d.jpg'),
+      runFFmpeg(['-y','-framerate','5','-i',path.join(framesForRemoval,'frame%06d.jpg'),
         '-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast',
         '-crf','28','-pix_fmt','yuv420p','-shortest',blurredPath], 300000);
       try { removalFrames.forEach(f=>fs.unlinkSync(path.join(framesForRemoval,f))); fs.rmdirSync(framesForRemoval); } catch(e){}
