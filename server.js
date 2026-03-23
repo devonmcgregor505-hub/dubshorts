@@ -281,7 +281,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
         timeout: 30000
       });
-      const wsJobId = wsJobRes.data.id;
+      console.log('WaveSpeed full response:', JSON.stringify(wsJobRes.data).slice(0,300));
+      const wsJobId = wsJobRes.data.id || wsJobRes.data.data?.id || wsJobRes.data.request_id;
       console.log('WaveSpeed job ID:', wsJobId);
 
       // Poll for result
