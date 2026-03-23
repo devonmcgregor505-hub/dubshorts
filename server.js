@@ -293,12 +293,13 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           headers: { 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
           timeout: 15000
         });
-        console.log(`WaveSpeed poll ${attempt + 1}: ${wsCheck.data.status}`);
-        if (wsCheck.data.status === 'completed' && wsCheck.data.outputs && wsCheck.data.outputs[0]) {
-          wsResult = wsCheck.data.outputs[0];
+        const wsData = wsCheck.data.data || wsCheck.data;
+        console.log(`WaveSpeed poll ${attempt + 1}: ${wsData.status}`);
+        if (wsData.status === 'completed' && wsData.outputs && wsData.outputs[0]) {
+          wsResult = wsData.outputs[0];
           break;
-        } else if (wsCheck.data.status === 'failed') {
-          throw new Error('WaveSpeed removal failed: ' + wsCheck.data.error);
+        } else if (wsData.status === 'failed') {
+          throw new Error('WaveSpeed removal failed: ' + wsData.error);
         }
       }
 
