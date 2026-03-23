@@ -306,9 +306,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0);
           ctx.drawImage(cleanPatch, bx, by, bw, bh);
-          fs.writeFileSync(framePath, canvas.toBuffer('image/jpeg', { quality: 0.92 }));
+          fs.writeFileSync(framePath, canvas.toBuffer('image/jpeg', { quality: 0.85 }));
+          canvas.width = 0; canvas.height = 0;
         } catch(e) { console.log('Frame paste error:', e.message); }
-        if (i % 50 === 0) console.log(`Patched ${i}/${removalFrames.length}`);
+        if (i % 10 === 0) { console.log(`Patched ${i}/${removalFrames.length}`); await new Promise(r=>setTimeout(r,10)); }
       }
 
       runFFmpeg(['-y','-framerate',String(fps),'-i',path.join(framesForRemoval,'frame%06d.jpg'),
