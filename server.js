@@ -301,11 +301,13 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       for (let i = 0; i < removalFrames.length; i++) {
         const framePath = path.join(framesForRemoval, removalFrames[i]);
         try {
+          const frameTime = i / fps;
+          const nearest = cleanPatches.reduce((a,b) => Math.abs(b.time-frameTime) < Math.abs(a.time-frameTime) ? b : a);
           const img = await loadImage(framePath);
           const canvas = createCanvas(fullW, fullH);
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0);
-          ctx.drawImage(cleanPatch, bx, by, bw, bh);
+          ctx.drawImage(nearest.patch, bx, by, bw, bh);
           fs.writeFileSync(framePath, canvas.toBuffer('image/jpeg', { quality: 0.85 }));
           canvas.width = 0; canvas.height = 0;
         } catch(e) { console.log('Frame paste error:', e.message); }
