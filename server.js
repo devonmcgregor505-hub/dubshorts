@@ -381,28 +381,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       // DUBBING DISABLED - pass through original video
       fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
       console.log('Dubbing skipped - using original video');
-      if (false && provider === 'elevenlabs') {
-        // ElevenLabs: upload video file, get back audio-only mp3
-        const audioData = await dubWithElevenLabs(targetLang, cleanVideoPath, timestamp);
-        fs.writeFileSync(audioPath, audioData);
-        // Probe what we got
-      const probeAudio = require('child_process').spawnSync('/usr/bin/ffmpeg', ['-i', audioPath], { encoding: 'utf8' });
-      console.log('Audio probe:', (probeAudio.stderr||'').slice(200, 600));
-      console.log('ElevenLabs dubbing complete! Audio saved.');
-      } else {
-        // ModelsLab: upload via URL, get back full dubbed video mp4
-        console.log('Uploading to temp storage...');
-        const uploadForm = new FormData();
-        uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
-        const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
-        const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
-        console.log('Testing URL access...'); try { await axios.head(videoUrl, {timeout:8000}); console.log('URL OK'); } catch(e) { console.log('URL FAILED:', e.message); }
-        console.log('Video URL:', videoUrl);
-        try { const t = await require('axios').default.head(videoUrl, {timeout:5000}); console.log('URL OK:', t.status); } catch(e) { console.log('URL FAIL:', e.message); }
-        const videoData = await dubWithModelsLab(videoUrl, targetLang);
-        fs.writeFileSync(dubbedVideoPath, videoData);
-        console.log('ModelsLab dubbing complete! Video saved.');
-      }
+      // Dubbing disabled - using original video
 
       // For transcription/captions: extract audio from dubbed content
       let cues = [];
