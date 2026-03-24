@@ -204,7 +204,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
           <div class="tc-ic">🗑</div>
           <div class="tc-info">
             <div class="tc-title">Remove Captions</div>
-            <div class="tc-desc">AI removes English text</div>
+            <div class="tc-desc">Draw box over captions to remove</div>
           </div>
           <label class="tog" onclick="event.stopPropagation()">
             <input type="checkbox" id="removeToggle" onchange="onRemove()">
@@ -380,8 +380,8 @@ function updateHint() {
   const add = document.getElementById('addToggle').checked;
   const h = document.getElementById('hintTxt');
   if (!fileInput.files[0]) { h.textContent = 'Upload a video to preview'; return; }
-  if (rem && add) h.textContent = 'AI will remove English captions · Spanish captions will be added';
-  else if (rem) h.textContent = 'AI will automatically detect and remove captions from your video';
+  if (rem && add) h.textContent = 'Draw a box over captions to remove · Spanish captions will be added';
+  else if (rem) h.textContent = 'Draw a box over the captions you want removed';
   else if (add) h.textContent = 'Preview shows where Spanish captions will appear — adjust in style panel';
   else h.textContent = 'Enable an option to get started';
 }
@@ -514,7 +514,7 @@ async function startTranslation(){
   hide('doneBox');hide('errBox');startProg(90000);
   const fd=new FormData();
   fd.append('video',f);
-  if(document.getElementById('removeToggle').checked) fd.append('removeCaption','true');
+  if(document.getElementById('removeToggle').checked && captionBox) fd.append('captionBox',JSON.stringify(captionBox));
   fd.append('captionStyle',JSON.stringify(getStyle()));
   try{
     const res=await fetch('/translate',{method:'POST',body:fd});

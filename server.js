@@ -137,7 +137,9 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   const allFiles = [videoPath, audioPath, blurredPath, captionedPath];
   console.log('File received:', req.file.originalname);
 
-  const removeCaption = req.body.removeCaption === 'true';
+  let captionBox = null;
+  if (req.body.captionBox) { try { captionBox = JSON.parse(req.body.captionBox); } catch(e) {} }
+  const removeCaption = !!captionBox;
   let captionStyle = null;
   if (req.body.captionStyle) { try { captionStyle = JSON.parse(req.body.captionStyle); } catch(e) {} }
 
@@ -159,50 +161,24 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
     // Run WaveSpeed caption removal on original video FIRST
     let cleanVideoPath = videoPath;
-    if (removeCaption) {
-      console.log('WaveSpeed AI caption removal on original video...');
-      // Upload original video to WaveSpeed
-      const wsUploadForm = new FormData();
-      wsUploadForm.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: 'video/mp4' });
-      const wsUploadRes = await axios.post('https://api.wavespeed.ai/api/v3/media/upload/binary', wsUploadForm, {
-        headers: { ...wsUploadForm.getHeaders(), 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
-        timeout: 120000
-      });
-      const wsVideoUrl = wsUploadRes.data.data.download_url;
-      console.log('WaveSpeed video URL:', wsVideoUrl);
-
-      const wsJobRes = await axios.post('https://api.wavespeed.ai/api/v3/wavespeed-ai/video-watermark-remover', {
-        video: wsVideoUrl
-      }, {
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
-        timeout: 30000
-      });
-      const wsJobId = wsJobRes.data.data?.id || wsJobRes.data.id;
-      console.log('WaveSpeed job ID:', wsJobId);
-
-      let wsResult = null;
-      for (let attempt = 0; attempt < 60; attempt++) {
-        await new Promise(r => setTimeout(r, 5000));
-        const wsCheck = await axios.get(`https://api.wavespeed.ai/api/v3/predictions/${wsJobId}/result`, {
-          headers: { 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
-          timeout: 15000
-        });
-        const wsStatus = wsCheck.data.data?.status || wsCheck.data.status;
-        const wsOutputs = wsCheck.data.data?.outputs || wsCheck.data.outputs;
-        console.log(`WaveSpeed poll ${attempt + 1}: ${wsStatus}`);
-        if ((wsStatus === 'completed' || wsStatus === 'succeeded') && wsOutputs && wsOutputs[0]) {
-          wsResult = wsOutputs[0];
-          break;
-        } else if (wsStatus === 'failed') {
-          throw new Error('WaveSpeed failed: ' + JSON.stringify(wsCheck.data));
-        }
-      }
-      if (!wsResult) throw new Error('WaveSpeed timed out');
-      console.log('WaveSpeed done! Downloading clean video...');
-      const wsVideoRes = await axios.get(wsResult, { responseType: 'arraybuffer', timeout: 120000 });
+    if (removeCaption && captionBox) {
+      console.log('LaMa AI caption removal...');
+      const { x, y, w, h } = captionBox;
       cleanVideoPath = path.resolve('uploads/clean_'+timestamp+'.mp4');
-      fs.writeFileSync(cleanVideoPath, wsVideoRes.data);
-      console.log('Clean video ready for dubbing');
+      const { spawnSync: spawnSyncLama } = require('child_process');
+      const lamaResult = spawnSyncLama('python3', [
+        path.join(__dirname, 'inpaint.py'),
+        videoPath, cleanVideoPath,
+        String(x), String(y), String(w), String(h)
+      ], { encoding: 'utf8', timeout: 300000, maxBuffer: 100*1024*1024 });
+      console.log('LaMa stdout:', lamaResult.stdout?.slice(-500));
+      if (lamaResult.stderr) console.log('LaMa stderr:', lamaResult.stderr?.slice(-300));
+      if (lamaResult.status !== 0 || !fs.existsSync(cleanVideoPath)) {
+        console.log('LaMa failed, using original video');
+        cleanVideoPath = videoPath;
+      } else {
+        console.log('LaMa removal done!');
+      }
     }
 
     console.log('Step 1: Uploading to temp storage...');
