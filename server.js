@@ -378,9 +378,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
 
       // Dub
-      console.log(`Dubbing with ${provider}...`);
-
-      if (provider === 'elevenlabs') {
+      // DUBBING DISABLED - pass through original video
+      fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
+      console.log('Dubbing skipped - using original video');
+      if (false && provider === 'elevenlabs') {
         // ElevenLabs: upload video file, get back audio-only mp3
         const audioData = await dubWithElevenLabs(targetLang, cleanVideoPath, timestamp);
         fs.writeFileSync(audioPath, audioData);
