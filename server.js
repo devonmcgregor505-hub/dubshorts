@@ -264,13 +264,13 @@ async function transcribeWithGroq(audioPath) {
 }
 
 // ── ELEVENLABS DUBBING ────────────────────────────────────────────────────────
-async function dubWithElevenLabs(videoUrl, targetLang) {
+async function dubWithElevenLabs(videoUrl, targetLang, localVideoPath) {
   const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
   const lang = langMap[targetLang] || 'es';
 
   // ElevenLabs needs a reliable URL - upload directly as file
   const elevenUploadForm = new FormData();
-  elevenUploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: 'video.mp4', contentType: 'video/mp4' });
+  elevenUploadForm.append('file', fs.createReadStream(localVideoPath), { filename: 'video.mp4', contentType: 'video/mp4' });
   const elevenFileRes = await axios.post('https://file.io/?expires=1d', elevenUploadForm, {
     headers: elevenUploadForm.getHeaders(), timeout: 120000
   });
@@ -434,7 +434,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       console.log(`Dubbing with ${provider}...`);
       let dubbedData;
       if (provider === 'elevenlabs') {
-        dubbedData = await dubWithElevenLabs(videoUrl, targetLang);
+        dubbedData = await dubWithElevenLabs(videoUrl, targetLang, cleanVideoPath);
       } else {
         dubbedData = await dubWithModelsLab(videoUrl, targetLang);
       }
