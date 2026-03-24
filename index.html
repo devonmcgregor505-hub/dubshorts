@@ -135,7 +135,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
   object-fit:cover;
   display:none;
 }
-#selCanvas{display:none;}
+#selCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
 
 .hint-bar{
   width:100%;
@@ -364,8 +364,6 @@ setTimeout(fitCanvas, 300);
 function onRemove() {
   const on = document.getElementById('removeToggle').checked;
   document.getElementById('removeCard').classList.toggle('on', on);
-  selCanvas.style.cursor = on ? 'crosshair' : 'default';
-  selCanvas.style.pointerEvents = on ? 'auto' : 'none';
   updateHint();
 }
 
