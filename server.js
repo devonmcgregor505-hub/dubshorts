@@ -317,7 +317,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       console.log('Extracting frames...');
       fs.mkdirSync(framesDir, { recursive: true });
       const captionFps = Math.min(fps, 15);
-      runFFmpeg(['-y','-i',videoForMerge,'-vf',`fps=${captionFps}`,'-q:v','3','-threads','2',path.join(framesDir,'frame%06d.jpg')], 300000);
+      const scaleFilter = `fps=${captionFps},scale=-2:720`;
+      runFFmpeg(['-y','-i',videoForMerge,'-vf',scaleFilter,'-q:v','3','-threads','2',path.join(framesDir,'frame%06d.jpg')], 300000);
+      const burnW = Math.round(vidW * 720/vidH);
+      const burnH = 720;
       console.log('Burning captions...');
       await burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, captionStyle);
       console.log('Reassembling...');
