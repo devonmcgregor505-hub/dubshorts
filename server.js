@@ -280,8 +280,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
             sttAttempts++;
             const sttPoll = await axios.post(sttRes.data.fetch_result, { key: process.env.MODELSLAB_API_KEY }, { headers: { 'Content-Type': 'application/json' } });
             console.log('STT poll '+sttAttempts+':', JSON.stringify(sttPoll.data).slice(0,200));
-            if (sttPoll.data.status === 'success' && sttPoll.data.text) {
-              transcript = sttPoll.data.text;
+            if (sttPoll.data.status === 'success' && (sttPoll.data.text || sttPoll.data.output)) {
+              transcript = sttPoll.data.text || sttPoll.data.output;
               break;
             }
           }
