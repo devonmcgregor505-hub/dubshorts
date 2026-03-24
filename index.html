@@ -408,6 +408,9 @@ function savePreset() {
     highlightColor: document.getElementById('highlightColor').value,
     provider: selectedProvider,
     language: document.getElementById('langSelect').value,
+    addCaptions: document.getElementById('addToggle').checked,
+    removeCaptions: document.getElementById('removeToggle').checked,
+    captionBox: captionBox,
     stylePanelCollapsed: document.getElementById('styleInner') ? document.getElementById('styleInner').style.display === 'none' : false,
   };
   localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
@@ -433,6 +436,9 @@ function loadPreset() {
     if (preset.highlightColor) document.getElementById('highlightColor').value = preset.highlightColor;
     if (preset.provider) setProvider(preset.provider);
     if (preset.language) document.getElementById('langSelect').value = preset.language;
+    if (preset.addCaptions !== undefined) { document.getElementById('addToggle').checked = preset.addCaptions; onAdd(); }
+    if (preset.removeCaptions !== undefined) { document.getElementById('removeToggle').checked = preset.removeCaptions; onRemove(); }
+    if (preset.captionBox) { captionBox = preset.captionBox; if (document.getElementById('clearBtn')) { document.getElementById('clearBtn').style.display = 'block'; } drawOverlay(); }
     if (preset.stylePanelCollapsed !== undefined) {
       const inner = document.getElementById('styleInner');
       const arrow = document.getElementById('styleArrow');
