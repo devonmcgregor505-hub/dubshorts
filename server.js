@@ -226,7 +226,7 @@ async function dubWithElevenLabs(targetLang, localVideoPath, timestamp) {
 
   // Re-encode to h264/aac so ElevenLabs can process it
   const encodedPath = path.resolve('uploads/eleven_encoded_'+timestamp+'.mp4');
-  runFFmpeg(['-y','-i',localVideoPath,'-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k',encodedPath], 60000);
+  runFFmpeg(['-y','-i',localVideoPath,'-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=44100','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k','-shortest',encodedPath], 60000);
   console.log('Re-encoded video for ElevenLabs');
 
   const elevenForm = new FormData();
