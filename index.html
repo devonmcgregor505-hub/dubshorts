@@ -329,7 +329,6 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
       <!-- Save Preset -->
       <button class="preset-btn" id="savePresetBtn" onclick="savePreset()">💾 Save Preset</button>
-      <button class="preset-btn" style="background:red;color:white;" onclick="localStorage.removeItem('dubshorts_preset');location.reload()">🗑 Clear Preset</button>
 
       <!-- Translate button -->
       <button class="submit" id="translateBtn" onclick="startTranslation()">→ Translate to Spanish</button>
@@ -424,6 +423,12 @@ function loadPreset() {
   try {
     const preset = JSON.parse(localStorage.getItem('dubshorts_preset'));
     if (!preset) return;
+    // Migrate old presets that lack new fields
+    if (preset.addCaptions === undefined && preset.removeCaptions === undefined && preset.captionBox === undefined) {
+      localStorage.removeItem('dubshorts_preset');
+      console.log('Old preset cleared, please re-save your preset.');
+      return;
+    }
     if (preset.yPct !== undefined) { captionYPct = preset.yPct; document.getElementById('yPos').value = preset.yPct; document.getElementById('yposVal').textContent = preset.yPct + '%'; }
     if (preset.fontFamily) document.getElementById('fontFamily').value = preset.fontFamily;
     if (preset.fontSize) { document.getElementById('fontSize').value = preset.fontSize; document.getElementById('sizeVal').textContent = preset.fontSize + '%'; }
