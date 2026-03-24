@@ -276,7 +276,7 @@ async function dubWithElevenLabs(videoUrl, targetLang, localVideoPath) {
   elevenForm.append('mode', 'automatic');
   elevenForm.append('num_speakers', '0');
   elevenForm.append('watermark', 'false');
-  elevenForm.append('highest_resolution', 'true');
+  // elevenForm.append('highest_resolution', 'true'); // requires Creator+ plan
 
   const startRes = await axios.post('https://api.elevenlabs.io/v1/dubbing', elevenForm, {
     headers: { ...elevenForm.getHeaders(), 'xi-api-key': process.env.ELEVENLABS_API_KEY },
