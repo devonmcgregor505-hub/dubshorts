@@ -35,7 +35,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use('/outputs', express.static('outputs'));
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: 'uploads/', limits: { fileSize: 200 * 1024 * 1024 } });
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
@@ -149,6 +149,11 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       const fpsM = (probe.stderr||'').match(/(\d+(?:\.\d+)?) fps/);
       if (dim) { vidW=parseInt(dim[1]); vidH=parseInt(dim[2]); }
       if (fpsM) fps=Math.min(parseFloat(fpsM[1]), 24);
+      const durCheck = (probe.stderr||'').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
+      if (durCheck) {
+        const durSecs = parseInt(durCheck[1])*3600+parseInt(durCheck[2])*60+parseFloat(durCheck[3]);
+        if (durSecs > 120) return res.status(400).json({ success: false, error: 'Video must be under 2 minutes' });
+      }
       console.log('Video:', vidW, 'x', vidH, '@', fps, 'fps');
     } catch(e) {}
 
@@ -311,8 +316,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     if (cues.length > 0) {
       console.log('Extracting frames...');
       fs.mkdirSync(framesDir, { recursive: true });
-      const captionFps = Math.min(fps, 24);
-      runFFmpeg(['-y','-i',videoForMerge,'-vf',`fps=${captionFps}`,'-q:v','2',path.join(framesDir,'frame%06d.jpg')], 300000);
+      const captionFps = Math.min(fps, 15);
+      runFFmpeg(['-y','-i',videoForMerge,'-vf',`fps=${captionFps}`,'-q:v','3','-threads','2',path.join(framesDir,'frame%06d.jpg')], 300000);
       console.log('Burning captions...');
       await burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, captionStyle);
       console.log('Reassembling...');
