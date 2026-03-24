@@ -317,7 +317,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   const framesDir = path.resolve('uploads/frames_'+timestamp);
   const captionedPath = path.resolve('uploads/captioned_'+timestamp+'.mp4');
   const outputPath = path.resolve('outputs/final_'+timestamp+'.mp4');
-  const allFiles = [videoPath, audioPath, dubbedVideoPath, captionedPath];
+  const allFiles = [videoPath, audioPath, dubbedVideoPath, captionedPath, path.resolve('uploads/raw_inpaint_'+timestamp+'.mp4')];
 
   console.log('File received:', req.file.originalname);
 
@@ -363,15 +363,18 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         console.log('OpenCV caption removal...');
         const { x, y, w, h } = captionBox;
         const cleanPath = path.resolve('uploads/clean_'+timestamp+'.mp4');
+        const rawInpaintPath = path.resolve('uploads/raw_inpaint_'+timestamp+'.mp4');
         const inpaintResult = spawnSync('python3', [
           path.join(__dirname, 'inpaint.py'),
-          videoPath, cleanPath,
+          videoPath, rawInpaintPath,
           String(x), String(y), String(w), String(h)
         ], { encoding: 'utf8', timeout: 1200000, maxBuffer: 100*1024*1024 });
         console.log('Inpaint stdout:', inpaintResult.stdout?.slice(-300) || 'EMPTY');
-        if (inpaintResult.status !== 0 || !fs.existsSync(cleanPath)) {
+        if (inpaintResult.status !== 0 || !fs.existsSync(rawInpaintPath)) {
           console.log('Inpaint failed, using original');
         } else {
+          runFFmpeg(['-y','-i',rawInpaintPath,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',cleanPath], 120000);
+          try { fs.unlinkSync(rawInpaintPath); } catch(e) {}
           cleanVideoPath = cleanPath;
           console.log('Caption removal done!');
         }
@@ -403,6 +406,28 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
       // For transcription/captions: extract audio from dubbed content
       let cues = [];
+      if (req.body.addCaption === 'true') {
+        try {
+          console.log('Extracting audio for Whisper...');
+          const whisperAudioPath = path.resolve('uploads/whisper_audio_'+timestamp+'.mp3');
+          const audioSource = provider === 'modelslab' ? dubbedVideoPath : audioPath;
+          runFFmpeg(['-y','-i',audioSource,'-vn','-ac','1','-ar','16000','-c:a','mp3',whisperAudioPath], 60000);
+          const whisperResult = spawnSync('python3', [
+            path.join(__dirname, 'transcribe.py'),
+            whisperAudioPath,
+            targetLang === 'none' ? 'en' : targetLang
+          ], { encoding: 'utf8', timeout: 300000, maxBuffer: 10*1024*1024 });
+          if (whisperResult.status === 0 && whisperResult.stdout) {
+            cues = JSON.parse(whisperResult.stdout.trim());
+            console.log('Whisper transcription done,', cues.length, 'cues');
+          } else {
+            console.log('Whisper failed:', whisperResult.stderr?.slice(-200));
+          }
+          try { fs.unlinkSync(whisperAudioPath); } catch(e) {}
+        } catch(e) {
+          console.log('Caption generation failed, skipping:', e.message);
+        }
+      }
 
       // VIDEO SOURCE for frame extraction and final merge
       // For elevenlabs: cleanVideoPath has the video (no audio)
@@ -435,8 +460,11 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         // audioPath = dubbed audio mp3 from ElevenLabs
         console.log('Merging video + ElevenLabs audio...');
         runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k','-shortest',outputPath], 180000);
+      } else if (provider === 'modelslab') {
+        // dubbedVideoPath already has video+audio from ModelsLab
+        runFFmpeg(['-y','-i',dubbedVideoPath,'-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',outputPath], 180000);
       } else {
-        // No dubbing - merge video with original audio from videoPath
+        // No dubbing - merge video with original audio
         runFFmpeg(['-y','-i',videoForMerge,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
       }
       console.log('Done!');

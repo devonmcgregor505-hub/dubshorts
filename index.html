@@ -328,7 +328,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
       </div>
 
       <!-- Save Preset -->
-      <button class="preset-btn" onclick="savePreset()">💾 Save Preset</button>
+      <button class="preset-btn" id="savePresetBtn" onclick="savePreset()">💾 Save Preset</button>
 
       <!-- Translate button -->
       <button class="submit" id="translateBtn" onclick="startTranslation()">→ Translate to Spanish</button>
@@ -414,7 +414,7 @@ function savePreset() {
     stylePanelCollapsed: document.getElementById('styleInner') ? document.getElementById('styleInner').style.display === 'none' : false,
   };
   localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
-  const btn = document.querySelector('.preset-btn');
+  const btn = document.getElementById('savePresetBtn');
   btn.textContent = '✓ Preset Saved!';
   setTimeout(() => btn.textContent = '💾 Save Preset', 2000);
 }
@@ -457,6 +457,9 @@ function loadPreset() {
 // ── PROVIDER ─────────────────────────────────────────────────────────────────
 function setProvider(p) {
   selectedProvider = p;
+  document.querySelectorAll('.provider-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.provider === p);
+  });
   document.getElementById('btnModels').classList.toggle('active', p === 'modelslab');
   document.getElementById('btnEleven').classList.toggle('active', p === 'elevenlabs');
 }
@@ -735,6 +738,7 @@ async function startTranslation() {
   fd.append('language', document.getElementById('langSelect').value);
   if (document.getElementById('removeToggle').checked && captionBox) fd.append('captionBox', JSON.stringify(captionBox));
   fd.append('captionStyle', JSON.stringify(getStyle()));
+  fd.append('addCaption', document.getElementById('addToggle').checked ? 'true' : 'false');
 
   try {
     const res = await fetch('/translate', { method: 'POST', body: fd });
