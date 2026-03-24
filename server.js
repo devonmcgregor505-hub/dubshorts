@@ -273,7 +273,8 @@ async function dubWithElevenLabs(videoUrl, targetLang) {
     target_lang: lang,
     mode: 'automatic',
     num_speakers: 0,
-    watermark: false
+    watermark: false,
+    source_lang: 'en'
   }, {
     headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
     timeout: 30000
