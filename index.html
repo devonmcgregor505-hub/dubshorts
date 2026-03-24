@@ -70,6 +70,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
 /* Toggles */
 .tog-row{display:flex;gap:8px;}
+.tc.active{border:2px solid #f5c518;box-shadow:0 0 10px rgba(245,197,24,0.3);}
 .tc{flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:10px 11px;display:flex;align-items:center;gap:8px;transition:all .15s;}
 .tc.on{border-color:rgba(245,225,50,.22);background:var(--yg);}
 .tc-ic{font-size:13px;flex-shrink:0;}
@@ -215,30 +216,22 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
 
       <!-- Toggles -->
+      <input type="checkbox" id="removeToggle" style="display:none" onchange="onRemove();autoSave();">
+      <input type="checkbox" id="addToggle" style="display:none" onchange="onAdd();autoSave();">
       <div class="tog-row">
-        <div class="tc" id="removeCard">
+        <div class="tc" id="removeCard" onclick="document.getElementById('removeToggle').click();" style="cursor:pointer;">
           <div class="tc-ic">🗑</div>
           <div class="tc-info">
             <div class="tc-title">Remove Captions</div>
             <div class="tc-desc">Draw box over captions</div>
           </div>
-          <label class="tog" onclick="event.stopPropagation()">
-            <input type="checkbox" id="removeToggle" onchange="onRemove();autoSave();">
-            <div class="tog-track"></div>
-            <div class="tog-thumb"></div>
-          </label>
         </div>
-        <div class="tc" id="addCard">
+        <div class="tc" id="addCard" onclick="document.getElementById('addToggle').click();" style="cursor:pointer;">
           <div class="tc-ic">💬</div>
           <div class="tc-info">
             <div class="tc-title">Add Captions</div>
             <div class="tc-desc">Translated subtitles</div>
           </div>
-          <label class="tog" onclick="event.stopPropagation()">
-            <input type="checkbox" id="addToggle" onchange="onAdd();autoSave();">
-            <div class="tog-track"></div>
-            <div class="tog-thumb"></div>
-          </label>
         </div>
       </div>
 
@@ -498,6 +491,7 @@ setTimeout(fitCanvas, 300);
 
 function onRemove() {
   const on = document.getElementById('removeToggle').checked;
+  document.getElementById('removeCard').classList.toggle('active', on);
   document.getElementById('removeCard').classList.toggle('on', on);
   selCanvas.style.pointerEvents = on ? 'auto' : 'none';
   selCanvas.style.cursor = on ? 'crosshair' : 'default';
@@ -506,6 +500,7 @@ function onRemove() {
 
 function onAdd() {
   const on = document.getElementById('addToggle').checked;
+  document.getElementById('addCard').classList.toggle('active', on);
   document.getElementById('addCard').classList.toggle('on', on);
   document.getElementById('stylePanel').style.display = on ? 'block' : 'none';
   drawOverlay();
