@@ -247,7 +247,8 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
       <!-- Caption Style -->
       <div class="style-panel" id="stylePanel" style="display:none">
-        <div class="sp-hd">Caption Style</div>
+        <div class="sp-hd" onclick="toggleStylePanel()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">Caption Style <span id="styleArrow">▼</span></div>
+        <div id="styleInner">
 
         <div class="ypos-row">
           <div class="ypos-lbl"><span>Vertical Position</span><span id="yposVal">70%</span></div>
@@ -325,6 +326,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
             <label>Shadow <span class="rv" id="shadowVal">0%</span></label>
             <div class="rr"><input type="range" id="shadowSize" min="0" max="50" value="0" step="1" oninput="document.getElementById('shadowVal').textContent=this.value+'%';drawOverlay()"></div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -752,6 +754,14 @@ async function startTranslation() {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 selCanvas.style.pointerEvents = 'none';
+
+function toggleStylePanel() {
+  const inner = document.getElementById('styleInner');
+  const arrow = document.getElementById('styleArrow');
+  const collapsed = inner.style.display === 'none';
+  inner.style.display = collapsed ? 'block' : 'none';
+  arrow.textContent = collapsed ? '▼' : '▶';
+}
 loadPreset();
 updateHint();
 updateTranslateBtn();
