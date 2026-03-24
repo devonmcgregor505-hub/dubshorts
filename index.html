@@ -553,6 +553,7 @@ selCanvas.addEventListener('mouseup', e => {
   const w = e.clientX-r.left-sx, h = e.clientY-r.top-sy;
   if (Math.abs(w)>6 && Math.abs(h)>6) {
     captionBox = { x:Math.min(sx,sx+w)/selCanvas.width, y:Math.min(sy,sy+h)/selCanvas.height, w:Math.abs(w)/selCanvas.width, h:Math.abs(h)/selCanvas.height };
+    try { const p=JSON.parse(localStorage.getItem('dubshorts_preset')||'{}'); p.captionBox=captionBox; localStorage.setItem('dubshorts_preset',JSON.stringify(p)); } catch(e) {}
     document.getElementById('clearBtn').style.display = 'block';
   }
   drawOverlay();
@@ -575,6 +576,7 @@ selCanvas.addEventListener('touchend', e => {
   const w=t.clientX-r.left-sx, h=t.clientY-r.top-sy;
   if (Math.abs(w)>6&&Math.abs(h)>6) {
     captionBox={x:Math.min(sx,sx+w)/selCanvas.width,y:Math.min(sy,sy+h)/selCanvas.height,w:Math.abs(w)/selCanvas.width,h:Math.abs(h)/selCanvas.height};
+    try { const p=JSON.parse(localStorage.getItem('dubshorts_preset')||'{}'); p.captionBox=captionBox; localStorage.setItem('dubshorts_preset',JSON.stringify(p)); } catch(e) {}
     document.getElementById('clearBtn').style.display='block';
   }
   drawOverlay();
