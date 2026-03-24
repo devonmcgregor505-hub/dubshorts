@@ -181,7 +181,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
     }
 
-    console.log('Step 1: Uploading to temp storage...');
+    // DUBBING DISABLED FOR TESTING
+    const dubbedVideoUrl = 'SKIP';
+    fs.writeFileSync(audioPath, fs.readFileSync(cleanVideoPath));
+    if (false) { console.log('Step 1: Uploading to temp storage...');
     const uploadForm = new FormData();
     uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
     const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
@@ -229,6 +232,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const dubbedRes = await axios.get(dubbedVideoUrl, { responseType: 'arraybuffer', timeout: 120000 });
     fs.writeFileSync(audioPath, dubbedRes.data); // reuse audioPath as temp dubbed video
 
+    } // end disabled dubbing
     let cues = [];
     if (captionStyle && captionStyle.enabled) {
       try {
