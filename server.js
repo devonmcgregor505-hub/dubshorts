@@ -486,6 +486,25 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   }
 });
 
+const SETTINGS_FILE = path.resolve('settings.json');
+
+app.get('/settings', (req, res) => {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      res.json(JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')));
+    } else {
+      res.json({});
+    }
+  } catch(e) { res.json({}); }
+});
+
+app.post('/settings', express.json(), (req, res) => {
+  try {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(req.body, null, 2));
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ ok: false }); }
+});
+
 app.get('/queue', (req, res) => {
   res.json({ active: activeJobs, waiting: queue.length, max: MAX_CONCURRENT });
 });
