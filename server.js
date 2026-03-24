@@ -378,7 +378,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
 
       // Dub
-      if (provider === 'elevenlabs') {
+      if (targetLang === 'none') {
+        fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
+        console.log('No translation selected');
+      } else if (provider === 'elevenlabs') {
         const audioData = await dubWithElevenLabs(targetLang, cleanVideoPath, timestamp);
         fs.writeFileSync(audioPath, audioData);
         console.log('ElevenLabs dubbing complete!');
@@ -393,6 +396,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         fs.writeFileSync(dubbedVideoPath, videoData);
         console.log('ModelsLab dubbing complete!');
       } else {
+        // No translation selected
         fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
         console.log('No dubbing - using original video');
       }
@@ -423,7 +427,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
       // Final merge
       console.log('Final merge...');
-      if (provider === 'elevenlabs') {
+      if (targetLang === 'none') {
+        fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
+        console.log('No translation selected');
+      } else if (provider === 'elevenlabs') {
         // videoForMerge = captioned video (no audio) OR cleanVideoPath
         // audioPath = dubbed audio mp3 from ElevenLabs
         console.log('Merging video + ElevenLabs audio...');

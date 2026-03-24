@@ -202,6 +202,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
       <div class="lang-row">
         <div class="lang-lbl">Select Language</div>
         <select class="lang-sel" id="langSelect">
+          <option value="none">🔇 None (No Translation)</option>
           <option value="es">🇪🇸 Spanish</option>
           <option value="hi">🇮🇳 Hindi</option>
           <option value="pt">🇧🇷 Portuguese</option>
@@ -211,11 +212,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
         </select>
       </div>
 
-      <!-- Provider -->
-      <div class="provider-row">
-        <button class="prov-btn active" id="btnModels" onclick="setProvider('modelslab')">ModelsLab</button>
-        <button class="prov-btn" id="btnEleven" onclick="setProvider('elevenlabs')">ElevenLabs</button>
-      </div>
+
 
       <!-- Toggles -->
       <div class="tog-row">
