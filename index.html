@@ -364,6 +364,8 @@ setTimeout(fitCanvas, 300);
 function onRemove() {
   const on = document.getElementById('removeToggle').checked;
   document.getElementById('removeCard').classList.toggle('on', on);
+  selCanvas.style.pointerEvents = on ? 'auto' : 'none';
+  selCanvas.style.cursor = on ? 'crosshair' : 'default';
   updateHint();
 }
 
