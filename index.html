@@ -405,7 +405,7 @@ function savePreset() {
     addCaption: document.getElementById('addToggle').checked,
   };
   localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
-  console.log('SAVED:', JSON.stringify(preset));
+
   const btn = document.getElementById('savePresetBtn');
   btn.textContent = '✓ Preset Saved!';
   setTimeout(() => btn.textContent = '💾 Save Preset', 2000);
@@ -414,7 +414,7 @@ function savePreset() {
 function loadPreset() {
   try {
     const preset = JSON.parse(localStorage.getItem('dubshorts_preset'));
-    console.log('LOADED:', JSON.stringify(preset));
+
     if (!preset) return;
     if (preset.yPct !== undefined) { captionYPct = preset.yPct; document.getElementById('yPos').value = preset.yPct; document.getElementById('yposVal').textContent = preset.yPct + '%'; }
     if (preset.fontFamily) document.getElementById('fontFamily').value = preset.fontFamily;
@@ -431,7 +431,7 @@ function loadPreset() {
     if (preset.language) document.getElementById('langSelect').value = preset.language;
     if (preset.removeCaption) { document.getElementById('removeToggle').checked = true; onRemove(); }
     if (preset.addCaption) { document.getElementById('addToggle').checked = true; onAdd(); }
-  } catch(e) {}
+  } catch(e) { console.error('loadPreset error:', e); }
 }
 
 // ── PROVIDER ─────────────────────────────────────────────────────────────────
@@ -478,7 +478,7 @@ fileInput.addEventListener('change', () => {
   updateHint();
 });
 
-document.getElementById('langSelect').addEventListener('change', function(){ updateTranslateBtn(); autoSave(); });
+document.getElementById('langSelect').addEventListener('change', function(){ updateTranslateBtn(); savePreset(); });
 
 function updateTranslateBtn() {
   const langNames = { es:'Spanish', hi:'Hindi', pt:'Portuguese', ja:'Japanese', fr:'French', pl:'Polish' };
