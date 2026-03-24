@@ -497,3 +497,12 @@ app.get('/queue', (req, res) => {
 });
 
 app.listen(PORT, ()=>{ console.log('DubShorts running at http://localhost:'+PORT); });
+
+// TEMP: serve last audio for debugging
+app.get('/test-audio', (req, res) => {
+  const files = require('fs').readdirSync('uploads').filter(f => f.startsWith('dubbed_audio'));
+  if (files.length === 0) return res.send('no audio files');
+  const latest = files.sort().pop();
+  res.setHeader('Content-Type', 'audio/mpeg');
+  require('fs').createReadStream('uploads/' + latest).pipe(res);
+});
