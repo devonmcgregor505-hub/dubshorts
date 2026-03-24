@@ -311,7 +311,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     if (cues.length > 0) {
       console.log('Extracting frames...');
       fs.mkdirSync(framesDir, { recursive: true });
-      const captionFps = Math.min(fps, 12);
+      const captionFps = Math.min(fps, 24);
       runFFmpeg(['-y','-i',videoForMerge,'-vf',`fps=${captionFps}`,'-q:v','2',path.join(framesDir,'frame%06d.jpg')], 300000);
       console.log('Burning captions...');
       await burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, captionStyle);
