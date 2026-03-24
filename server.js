@@ -406,12 +406,19 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
       // For transcription/captions: extract audio from dubbed content
       let cues = [];
+
+      // VIDEO SOURCE for frame extraction and final merge
+      // For elevenlabs: cleanVideoPath has the video (no audio)
+      // For modelslab: dubbedVideoPath has video+audio
+      const videoSource = provider === 'modelslab' ? dubbedVideoPath : cleanVideoPath;
+      let videoForMerge = videoSource;
+
+      // Whisper transcription - runs after dub so audio is ready
       if (req.body.addCaption === 'true') {
         try {
           console.log('Extracting audio for Whisper...');
           const whisperAudioPath = path.resolve('uploads/whisper_audio_'+timestamp+'.mp3');
-          const audioSource = provider === 'modelslab' ? dubbedVideoPath : audioPath;
-          runFFmpeg(['-y','-i',audioSource,'-vn','-ac','1','-ar','16000','-c:a','mp3',whisperAudioPath], 60000);
+          runFFmpeg(['-y','-i',videoSource,'-vn','-ac','1','-ar','16000','-c:a','mp3',whisperAudioPath], 60000);
           const whisperResult = spawnSync('python3', [
             path.join(__dirname, 'transcribe.py'),
             whisperAudioPath,
@@ -428,12 +435,6 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           console.log('Caption generation failed, skipping:', e.message);
         }
       }
-
-      // VIDEO SOURCE for frame extraction and final merge
-      // For elevenlabs: cleanVideoPath has the video (no audio)
-      // For modelslab: dubbedVideoPath has video+audio
-      const videoSource = cleanVideoPath;
-      let videoForMerge = videoSource;
 
       // Burn captions if needed
       if (cues.length > 0) {
