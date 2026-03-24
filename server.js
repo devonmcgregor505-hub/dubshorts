@@ -385,32 +385,6 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
       // For transcription/captions: extract audio from dubbed content
       let cues = [];
-      if (captionStyle && captionStyle.enabled) {
-        try {
-          console.log('Transcribing with Groq...');
-          const audioForSTT = path.resolve('uploads/stt_audio_'+timestamp+'.mp3');
-          // Extract audio from original video for STT
-          runFFmpeg(['-y','-i',videoPath,'-vn','-ar','16000','-ac','1','-b:a','64k',audioForSTT], 60000);
-          const groqData = await transcribeWithGroq(audioForSTT);
-          try { fs.unlinkSync(audioForSTT); } catch(e) {}
-          console.log('Groq transcript:', groqData.text?.slice(0,100));
-
-          if (groqData.words && groqData.words.length > 0) {
-            groqData.words.forEach(w => {
-              cues.push({ start: w.start, end: w.end, text: w.word.trim() });
-            });
-            console.log(`Built ${cues.length} word-level cues`);
-          } else if (groqData.text) {
-            const probeRes = spawnSync(FFMPEG_PATH, ['-i', provider === 'elevenlabs' ? audioPath : dubbedVideoPath, '-f', 'null', '-'], { encoding: 'utf8' });
-            const durMatch = (probeRes.stderr||'').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
-            const totalDur = durMatch ? parseInt(durMatch[1])*3600+parseInt(durMatch[2])*60+parseFloat(durMatch[3]) : 30;
-            const words = groqData.text.trim().split(/\s+/).filter(w => w.length > 0);
-            const wordDur = totalDur / words.length;
-            words.forEach((word, i) => cues.push({ start: i*wordDur, end: (i+1)*wordDur, text: word }));
-            console.log(`Built ${cues.length} evenly-spaced cues`);
-          }
-        } catch(e) { console.log('Transcription failed:', e.message); }
-      }
 
       // VIDEO SOURCE for frame extraction and final merge
       // For elevenlabs: cleanVideoPath has the video (no audio)
