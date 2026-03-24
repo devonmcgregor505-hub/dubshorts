@@ -183,10 +183,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
     }
 
-    // DUBBING DISABLED FOR TESTING
-    const dubbedVideoUrl = 'SKIP';
-    fs.copyFileSync(cleanVideoPath, audioPath);
-    if (false) { console.log('Step 1: Uploading to temp storage...');
+    console.log('Step 1: Uploading to temp storage...');
     const uploadForm = new FormData();
     uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
     const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
@@ -234,7 +231,6 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     const dubbedRes = await axios.get(dubbedVideoUrl, { responseType: 'arraybuffer', timeout: 120000 });
     fs.writeFileSync(audioPath, dubbedRes.data); // reuse audioPath as temp dubbed video
 
-    } // end disabled dubbing
     let cues = [];
     if (captionStyle && captionStyle.enabled) {
       try {
@@ -314,11 +310,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
     console.log('Final merge...');
     // ModelsLab returns complete dubbed video - just copy it to output
-    if (dubbedVideoUrl === 'SKIP') {
-      runFFmpeg(['-y','-i',videoForMerge,'-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p','-an',outputPath]);
-    } else {
-      runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a?','-c:v','copy','-c:a','aac','-shortest',outputPath]);
-    }
+    runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a?','-c:v','copy','-c:a','aac','-shortest',outputPath]);
     console.log('Done!');
     allFiles.forEach(f=>{try{if(fs.existsSync(f))fs.unlinkSync(f);}catch(e){}});
     setTimeout(()=>{try{if(fs.existsSync(outputPath))fs.unlinkSync(outputPath);}catch(e){}}, 600000);
