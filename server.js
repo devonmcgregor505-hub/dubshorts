@@ -274,7 +274,8 @@ async function dubWithElevenLabs(videoUrl, targetLang, localVideoPath) {
   const elevenFileRes = await axios.post('https://file.io/?expires=1d', elevenUploadForm, {
     headers: elevenUploadForm.getHeaders(), timeout: 120000
   });
-  const elevenVideoUrl = elevenFileRes.data.link;
+  console.log('file.io response:', JSON.stringify(elevenFileRes.data).slice(0,200));
+  const elevenVideoUrl = elevenFileRes.data.link || elevenFileRes.data.url;
   console.log('ElevenLabs video URL:', elevenVideoUrl);
 
   const elevenForm = new FormData();
