@@ -323,7 +323,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
     console.log('Final merge...');
     // ModelsLab returns complete dubbed video - just copy it to output
-    runFFmpeg(['-y','-i',videoForMerge,'-c:v','copy','-c:a','copy',outputPath]);
+    runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','copy','-c:a','aac','-shortest',outputPath]);
     console.log('Done!');
     allFiles.forEach(f=>{try{if(fs.existsSync(f))fs.unlinkSync(f);}catch(e){}});
     setTimeout(()=>{try{if(fs.existsSync(outputPath))fs.unlinkSync(outputPath);}catch(e){}}, 600000);
