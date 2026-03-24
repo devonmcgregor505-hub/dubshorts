@@ -170,7 +170,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         path.join(__dirname, 'inpaint.py'),
         videoPath, cleanVideoPath,
         String(x), String(y), String(w), String(h)
-      ], { encoding: 'utf8', timeout: 300000, maxBuffer: 100*1024*1024 });
+      ], { encoding: 'utf8', timeout: 600000, maxBuffer: 100*1024*1024 });
       console.log('LaMa stdout:', lamaResult.stdout?.slice(-1000) || 'EMPTY');
       console.log('LaMa stderr tail:', lamaResult.stderr?.slice(-500) || 'EMPTY');
       console.log('LaMa exit code:', lamaResult.status);

@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y \
 # Install Python packages
 RUN pip3 install simple-lama-inpainting opencv-python-headless numpy Pillow --break-system-packages
 
+# Pre-download LaMa model during build so it's cached
+RUN python3 -c "from simple_lama_inpainting import SimpleLama; SimpleLama()" 
+
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
