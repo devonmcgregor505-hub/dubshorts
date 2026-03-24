@@ -412,6 +412,7 @@ function savePreset() {
     addCaption: document.getElementById('addToggle').checked,
   };
   localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
+  console.log('SAVED:', JSON.stringify(preset));
   const btn = document.getElementById('savePresetBtn');
   btn.textContent = '✓ Preset Saved!';
   setTimeout(() => btn.textContent = '💾 Save Preset', 2000);
@@ -420,6 +421,7 @@ function savePreset() {
 function loadPreset() {
   try {
     const preset = JSON.parse(localStorage.getItem('dubshorts_preset'));
+    console.log('LOADED:', JSON.stringify(preset));
     if (!preset) return;
     if (preset.yPct !== undefined) { captionYPct = preset.yPct; document.getElementById('yPos').value = preset.yPct; document.getElementById('yposVal').textContent = preset.yPct + '%'; }
     if (preset.fontFamily) document.getElementById('fontFamily').value = preset.fontFamily;
