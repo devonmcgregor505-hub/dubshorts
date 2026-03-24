@@ -268,15 +268,15 @@ async function dubWithElevenLabs(videoUrl, targetLang) {
   const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
   const lang = langMap[targetLang] || 'es';
 
-  const startRes = await axios.post('https://api.elevenlabs.io/v1/dubbing', {
-    source_url: videoUrl,
-    target_lang: lang,
-    mode: 'automatic',
-    num_speakers: 0,
-    watermark: false,
-    source_lang: 'en'
-  }, {
-    headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
+  const elevenForm = new FormData();
+  elevenForm.append('source_url', videoUrl);
+  elevenForm.append('target_lang', lang);
+  elevenForm.append('source_lang', 'en');
+  elevenForm.append('mode', 'automatic');
+  elevenForm.append('num_speakers', '0');
+  elevenForm.append('watermark', 'false');
+  const startRes = await axios.post('https://api.elevenlabs.io/v1/dubbing', elevenForm, {
+    headers: { ...elevenForm.getHeaders(), 'xi-api-key': process.env.ELEVENLABS_API_KEY },
     timeout: 30000
   });
 
