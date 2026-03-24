@@ -434,8 +434,10 @@ function loadPreset() {
     if (preset.highlightColor) document.getElementById('highlightColor').value = preset.highlightColor;
     if (preset.provider) setProvider(preset.provider);
     if (preset.language) document.getElementById('langSelect').value = preset.language;
-    if (preset.removeCaption) { document.getElementById('removeToggle').checked = true; onRemove(); }
-    if (preset.addCaption) { document.getElementById('addToggle').checked = true; onAdd(); }
+    document.getElementById('removeToggle').checked = preset.removeCaption === true;
+    onRemove();
+    document.getElementById('addToggle').checked = preset.addCaption === true;
+    onAdd();
   } catch(e) {}
 }
 
