@@ -281,7 +281,7 @@ async function dubWithModelsLab(videoUrl, targetLang) {
     speed: 1.0,
     file_prefix: 'dub_'+lang+'_'+Date.now()+'_'+Math.random().toString(36).slice(2),
     base64: false, webhook: null, track_id: null
-  }, { headers: { 'Content-Type': 'application/json' }, timeout: 30000 });
+  }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
 
   console.log('ModelsLab response:', JSON.stringify(dubRes.data).slice(0, 300));
 
@@ -291,10 +291,10 @@ async function dubWithModelsLab(videoUrl, targetLang) {
   }
 
   if (dubRes.data.status === 'processing' && dubRes.data.fetch_result) {
-    for (let attempts = 0; attempts < 120; attempts++) {
+    for (let attempts = 0; attempts < 180; attempts++) {
       await new Promise(r => setTimeout(r, 5000));
       const poll = await axios.post(dubRes.data.fetch_result, { key: process.env.MODELSLAB_API_KEY }, {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' }, timeout: 30000
       });
       console.log(`Poll ${attempts+1}: ${poll.data.status}`);
       if (poll.data.status === 'success' && poll.data.output?.[0]) {
