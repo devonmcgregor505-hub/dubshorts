@@ -41,7 +41,7 @@ if (!fs.existsSync('cache')) fs.mkdirSync('cache');
 
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 
-// ── QUEUE ────────────────────────────────────────────────────────────────────
+// ── QUEUE ─────────────────────────────────────────────────────────────────────
 const queue = [];
 let activeJobs = 0;
 const MAX_CONCURRENT = 2;
@@ -60,21 +60,19 @@ async function processQueue() {
   try { resolve(await job()); } catch(e) { reject(e); } finally { activeJobs--; processQueue(); }
 }
 
-// ── CACHE ────────────────────────────────────────────────────────────────────
+// ── CACHE ─────────────────────────────────────────────────────────────────────
 function getCacheKey(fileBuffer, lang, provider) {
   return crypto.createHash('md5').update(fileBuffer).update(lang).update(provider).digest('hex');
 }
-
 function getCachedResult(key) {
   const p = path.join('cache', key + '.mp4');
   return fs.existsSync(p) ? p : null;
 }
-
 function setCachedResult(key, outputPath) {
   try { fs.copyFileSync(outputPath, path.join('cache', key + '.mp4')); } catch(e) {}
 }
 
-// ── CAPTIONS ─────────────────────────────────────────────────────────────────
+// ── CAPTIONS ──────────────────────────────────────────────────────────────────
 async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
   style = style || {};
   const yPct = (style.yPct !== undefined ? style.yPct : 75) / 100;
@@ -87,37 +85,30 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
   const outlineWidthPct = (style.outlineWidth || 15) / 100;
   const textCase = style.textCase || 'upper';
   const shadowSize = style.shadowSize || 0;
-  const captionMode = style.captionMode || 'single'; // 'single' | 'multi' | 'highlight'
+  const captionMode = style.captionMode || 'single';
   const highlightColor = style.highlightColor || '#f5e132';
 
   const frames = fs.readdirSync(framesDir).filter(f => f.endsWith('.jpg')).sort();
   console.log(`Burning captions: ${frames.length} frames, ${fontSize}px, y=${Math.round(yPct*100)}%`);
 
-  // Group cues into chunks for multi/highlight mode
   function getChunkAtTime(t) {
     if (captionMode === 'single') {
       const cue = cues.find(c => t >= c.start && t < c.end);
       return cue ? { words: [{ text: cue.text, highlight: true }] } : null;
     }
-    // For multi/highlight: find which chunk contains t
     const idx = cues.findIndex(c => t >= c.start && t < c.end);
     if (idx < 0) return null;
-    // Build chunk: go back to start of line, collect words that fit
-    const chunk = buildChunk(idx, vidW, fontSize, fontFamily, textStyle);
-    return chunk;
+    return buildChunk(idx, vidW, fontSize, fontFamily, textStyle);
   }
 
   function buildChunk(activeIdx, w, fs, ff, ts) {
-    // Find start of this chunk
     let start = activeIdx;
     while (start > 0) {
       const prev = cues[start - 1];
       const curr = cues[start];
-      // New chunk if gap > 0.5s
       if (curr.start - prev.end > 0.5) break;
       start--;
     }
-    // Collect words that fit on ~2 lines
     const words = [];
     const canvas = createCanvas(w, 100);
     const ctx = canvas.getContext('2d');
@@ -153,7 +144,6 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
 
     const x = vidW / 2;
     const y = yPct * vidH;
-
     ctx.font = `${textStyle} ${fontSize}px ${fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -162,91 +152,51 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
       let txt = chunk.words[0].text;
       if (textCase === 'upper') txt = txt.toUpperCase();
       else if (textCase === 'lower') txt = txt.toLowerCase();
-
-      // Shadow
-      if (shadowSize > 0) {
-        ctx.shadowColor = 'rgba(0,0,0,0.9)';
-        ctx.shadowBlur = shadowSize * fontSize;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = shadowSize * fontSize * 0.3;
-      }
-      if (outlineWidthPct > 0) {
-        ctx.lineWidth = fontSize * outlineWidthPct;
-        ctx.strokeStyle = outlineColor;
-        ctx.lineJoin = 'round';
-        ctx.strokeText(txt, x, y);
-      }
+      if (shadowSize > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadowSize * fontSize; ctx.shadowOffsetY = shadowSize * fontSize * 0.3; }
+      if (outlineWidthPct > 0) { ctx.lineWidth = fontSize * outlineWidthPct; ctx.strokeStyle = outlineColor; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); }
       ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      ctx.fillStyle = textColor;
-      ctx.fillText(txt, x, y);
+      ctx.fillStyle = textColor; ctx.fillText(txt, x, y);
     } else {
-      // Multi / highlight mode - render words on up to 2 lines
       const words = chunk.words.map(w => {
         let txt = w.text;
         if (textCase === 'upper') txt = txt.toUpperCase();
         else if (textCase === 'lower') txt = txt.toLowerCase();
         return { ...w, txt };
       });
-
-      // Calculate total width for centering
       const wordWidths = words.map(w => ctx.measureText(w.txt + ' ').width);
-      const totalW = wordWidths.reduce((a, b) => a + b, 0);
-
-      // Wrap into lines
       const lines = [];
-      let currentLine = [];
-      let currentW = 0;
+      let currentLine = [], currentW = 0;
       words.forEach((w, i) => {
         if (currentW + wordWidths[i] > vidW * 0.85 && currentLine.length > 0) {
-          lines.push(currentLine);
-          currentLine = [w];
-          currentW = wordWidths[i];
-        } else {
-          currentLine.push(w);
-          currentW += wordWidths[i];
-        }
+          lines.push(currentLine); currentLine = [w]; currentW = wordWidths[i];
+        } else { currentLine.push(w); currentW += wordWidths[i]; }
       });
       if (currentLine.length) lines.push(currentLine);
-
       const lineH = fontSize * 1.3;
       const startY = y - ((lines.length - 1) * lineH) / 2;
-
       lines.forEach((line, li) => {
         const lineW = line.reduce((acc, w, i) => acc + ctx.measureText(w.txt + ' ').width, 0);
         let curX = vidW / 2 - lineW / 2;
         const lineY = startY + li * lineH;
-
         line.forEach(w => {
           const ww = ctx.measureText(w.txt + ' ').width;
           const cx = curX + ww / 2 - ctx.measureText(' ').width / 2;
           const color = (captionMode === 'highlight' && w.highlight) ? highlightColor : textColor;
-
-          if (shadowSize > 0) {
-            ctx.shadowColor = 'rgba(0,0,0,0.9)';
-            ctx.shadowBlur = shadowSize * fontSize;
-            ctx.shadowOffsetY = shadowSize * fontSize * 0.3;
-          }
-          if (outlineWidthPct > 0) {
-            ctx.lineWidth = fontSize * outlineWidthPct;
-            ctx.strokeStyle = outlineColor;
-            ctx.lineJoin = 'round';
-            ctx.strokeText(w.txt, cx, lineY);
-          }
+          if (shadowSize > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadowSize * fontSize; ctx.shadowOffsetY = shadowSize * fontSize * 0.3; }
+          if (outlineWidthPct > 0) { ctx.lineWidth = fontSize * outlineWidthPct; ctx.strokeStyle = outlineColor; ctx.lineJoin = 'round'; ctx.strokeText(w.txt, cx, lineY); }
           ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-          ctx.fillStyle = color;
-          ctx.fillText(w.txt, cx, lineY);
+          ctx.fillStyle = color; ctx.fillText(w.txt, cx, lineY);
           curX += ww;
         });
       });
     }
-
     fs.writeFileSync(framePath, canvas.toBuffer('image/jpeg', { quality: 0.92 }));
     if (i % 30 === 0) console.log(`Captioned ${i}/${frames.length}`);
   }
   console.log('All frames captioned!');
 }
 
-// ── GROQ STT ─────────────────────────────────────────────────────────────────
+// ── GROQ STT ──────────────────────────────────────────────────────────────────
 async function transcribeWithGroq(audioPath) {
   const FormDataNode = require('form-data');
   const form = new FormDataNode();
@@ -255,7 +205,6 @@ async function transcribeWithGroq(audioPath) {
   form.append('response_format', 'verbose_json');
   form.append('timestamp_granularities[]', 'word');
   form.append('language', 'es');
-
   const res = await axios.post('https://api.groq.com/openai/v1/audio/transcriptions', form, {
     headers: { ...form.getHeaders(), 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
     timeout: 60000
@@ -263,40 +212,42 @@ async function transcribeWithGroq(audioPath) {
   return res.data;
 }
 
-// ── ELEVENLABS DUBBING ────────────────────────────────────────────────────────
-async function dubWithElevenLabs(videoUrl, targetLang, localVideoPath) {
+// ── ELEVENLABS ────────────────────────────────────────────────────────────────
+// ElevenLabs flow:
+// 1. Re-encode video to h264 so ElevenLabs accepts it
+// 2. Upload file directly to ElevenLabs dubbing API
+// 3. Poll until status === 'dubbed'
+// 4. Download audio from /audio/{lang} endpoint (returns audio-only mp3)
+// 5. Save as audioPath
+// Then in main: merge cleanVideoPath (video) + audioPath (dubbed audio) = output
+async function dubWithElevenLabs(targetLang, localVideoPath, timestamp) {
   const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
   const lang = langMap[targetLang] || 'es';
 
-  // Re-encode to h264 so ElevenLabs can process it
-  const elevenEncodedPath = localVideoPath.replace('.mp4', '_h264.mp4');
-  const { spawnSync: spawnSyncEl } = require('child_process');
-  const encodeRes = spawnSyncEl(process.env.PATH ? '/usr/bin/ffmpeg' : require('ffmpeg-static'), 
-    ['-y','-i',localVideoPath,'-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k',elevenEncodedPath],
-    { encoding: 'utf8', timeout: 60000 }
-  );
-  const uploadPath = (encodeRes.status === 0 && require('fs').existsSync(elevenEncodedPath)) ? elevenEncodedPath : localVideoPath;
-  console.log('ElevenLabs upload path:', uploadPath, 'encode status:', encodeRes.status);
+  // Re-encode to h264/aac so ElevenLabs can process it
+  const encodedPath = path.resolve('uploads/eleven_encoded_'+timestamp+'.mp4');
+  runFFmpeg(['-y','-i',localVideoPath,'-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k',encodedPath], 60000);
+  console.log('Re-encoded video for ElevenLabs');
 
   const elevenForm = new FormData();
-  elevenForm.append('file', fs.createReadStream(uploadPath), { filename: 'video.mp4', contentType: 'video/mp4' });
+  elevenForm.append('file', fs.createReadStream(encodedPath), { filename: 'video.mp4', contentType: 'video/mp4' });
   elevenForm.append('target_lang', lang);
   elevenForm.append('source_lang', 'en');
   elevenForm.append('mode', 'automatic');
   elevenForm.append('num_speakers', '0');
   elevenForm.append('watermark', 'false');
-  // elevenForm.append('highest_resolution', 'true'); // requires Creator+ plan
 
   const startRes = await axios.post('https://api.elevenlabs.io/v1/dubbing', elevenForm, {
     headers: { ...elevenForm.getHeaders(), 'xi-api-key': process.env.ELEVENLABS_API_KEY },
-    timeout: 120000,
-    maxContentLength: Infinity,
-    maxBodyLength: Infinity
+    timeout: 120000, maxContentLength: Infinity, maxBodyLength: Infinity
   });
+
+  try { fs.unlinkSync(encodedPath); } catch(e) {}
 
   const dubbingId = startRes.data.dubbing_id;
   console.log('ElevenLabs dubbing ID:', dubbingId);
 
+  // Poll for completion
   for (let i = 0; i < 60; i++) {
     await new Promise(r => setTimeout(r, 5000));
     const status = await axios.get(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}`, {
@@ -304,19 +255,20 @@ async function dubWithElevenLabs(videoUrl, targetLang, localVideoPath) {
     });
     console.log(`ElevenLabs poll ${i+1}: ${status.data.status}`);
     if (status.data.status === 'dubbed') {
+      // Download dubbed AUDIO (this endpoint returns audio only - mp3)
       const dlRes = await axios.get(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}/audio/${lang}`, {
         headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY },
-        responseType: 'arraybuffer',
-        timeout: 120000
+        responseType: 'arraybuffer', timeout: 120000
       });
-      return dlRes.data;
+      console.log('ElevenLabs audio downloaded, size:', dlRes.data.byteLength);
+      return dlRes.data; // This is audio-only mp3 data
     }
     if (status.data.status === 'failed') throw new Error('ElevenLabs dubbing failed');
   }
   throw new Error('ElevenLabs dubbing timed out');
 }
 
-// ── MODELSLAB DUBBING ─────────────────────────────────────────────────────────
+// ── MODELSLAB ─────────────────────────────────────────────────────────────────
 async function dubWithModelsLab(videoUrl, targetLang) {
   const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
   const lang = langMap[targetLang] || 'es';
@@ -328,9 +280,7 @@ async function dubWithModelsLab(videoUrl, targetLang) {
     output_lang: lang,
     speed: 1.0,
     file_prefix: 'dub_'+lang+'_'+Date.now()+'_'+Math.random().toString(36).slice(2),
-    base64: false,
-    webhook: null,
-    track_id: null
+    base64: false, webhook: null, track_id: null
   }, { headers: { 'Content-Type': 'application/json' }, timeout: 30000 });
 
   console.log('ModelsLab response:', JSON.stringify(dubRes.data).slice(0, 300));
@@ -360,12 +310,14 @@ async function dubWithModelsLab(videoUrl, targetLang) {
 app.post('/translate', upload.single('video'), async (req, res) => {
   const videoPath = path.resolve(req.file.path);
   const timestamp = Date.now();
-  const audioPath = path.resolve('uploads/dubbed_'+timestamp+'.mp4');
-  const blurredPath = path.resolve('uploads/blurred_'+timestamp+'.mp4');
+  // audioPath = dubbed audio (mp3 for elevenlabs, mp4 for modelslab)
+  const audioPath = path.resolve('uploads/dubbed_audio_'+timestamp+'.mp3');
+  // videoWithAudioPath = for modelslab this is the full dubbed video mp4
+  const dubbedVideoPath = path.resolve('uploads/dubbed_video_'+timestamp+'.mp4');
   const framesDir = path.resolve('uploads/frames_'+timestamp);
   const captionedPath = path.resolve('uploads/captioned_'+timestamp+'.mp4');
   const outputPath = path.resolve('outputs/final_'+timestamp+'.mp4');
-  const allFiles = [videoPath, audioPath, blurredPath, captionedPath];
+  const allFiles = [videoPath, audioPath, dubbedVideoPath, captionedPath];
 
   console.log('File received:', req.file.originalname);
 
@@ -376,12 +328,12 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   const provider = req.body.provider || 'modelslab';
   const targetLang = req.body.language || 'es';
 
-  // Check cache
+  // Cache check
   const fileBuffer = fs.readFileSync(videoPath);
   const cacheKey = getCacheKey(fileBuffer, targetLang, provider);
   const cached = getCachedResult(cacheKey);
   if (cached) {
-    console.log('Cache hit! Returning cached result');
+    console.log('Cache hit!');
     const cachedOut = path.resolve('outputs/final_'+timestamp+'.mp4');
     fs.copyFileSync(cached, cachedOut);
     setTimeout(()=>{ try { if(fs.existsSync(cachedOut)) fs.unlinkSync(cachedOut); } catch(e){} }, 600000);
@@ -410,81 +362,89 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       if (captionBox) {
         console.log('OpenCV caption removal...');
         const { x, y, w, h } = captionBox;
-        cleanVideoPath = path.resolve('uploads/clean_'+timestamp+'.mp4');
-        const result = spawnSync('python3', [
+        const cleanPath = path.resolve('uploads/clean_'+timestamp+'.mp4');
+        const inpaintResult = spawnSync('python3', [
           path.join(__dirname, 'inpaint.py'),
-          videoPath, cleanVideoPath,
+          videoPath, cleanPath,
           String(x), String(y), String(w), String(h)
         ], { encoding: 'utf8', timeout: 1200000, maxBuffer: 100*1024*1024 });
-        console.log('Inpaint stdout:', result.stdout?.slice(-500) || 'EMPTY');
-        if (result.status !== 0 || !fs.existsSync(cleanVideoPath)) {
+        console.log('Inpaint stdout:', inpaintResult.stdout?.slice(-300) || 'EMPTY');
+        if (inpaintResult.status !== 0 || !fs.existsSync(cleanPath)) {
           console.log('Inpaint failed, using original');
-          cleanVideoPath = videoPath;
         } else {
+          cleanVideoPath = cleanPath;
           console.log('Caption removal done!');
         }
       }
 
-      // Upload to tmpfiles
-      console.log('Uploading to temp storage...');
-      const uploadForm = new FormData();
-      uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
-      const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
-      const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
-      console.log('Video URL:', videoUrl);
-
-      // Dubbing
+      // Dub
       console.log(`Dubbing with ${provider}...`);
-      let dubbedData;
+
       if (provider === 'elevenlabs') {
-        dubbedData = await dubWithElevenLabs(videoUrl, targetLang, cleanVideoPath);
+        // ElevenLabs: upload video file, get back audio-only mp3
+        const audioData = await dubWithElevenLabs(targetLang, cleanVideoPath, timestamp);
+        fs.writeFileSync(audioPath, audioData);
+        console.log('ElevenLabs dubbing complete! Audio saved.');
       } else {
-        dubbedData = await dubWithModelsLab(videoUrl, targetLang);
+        // ModelsLab: upload via URL, get back full dubbed video mp4
+        console.log('Uploading to temp storage...');
+        const uploadForm = new FormData();
+        uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
+        const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
+        const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+        console.log('Video URL:', videoUrl);
+
+        const videoData = await dubWithModelsLab(videoUrl, targetLang);
+        fs.writeFileSync(dubbedVideoPath, videoData);
+        console.log('ModelsLab dubbing complete! Video saved.');
       }
-      fs.writeFileSync(audioPath, dubbedData);
-      console.log('Dubbing complete!');
 
-
-
-      // Transcription with Groq
+      // For transcription/captions: extract audio from dubbed content
       let cues = [];
       if (captionStyle && captionStyle.enabled) {
         try {
           console.log('Transcribing with Groq...');
-          const dubbedAudioPath = path.resolve('uploads/dubbed_audio_'+timestamp+'.mp3');
-          runFFmpeg(['-y','-i',audioPath,'-vn','-ar','16000','-ac','1','-b:a','64k',dubbedAudioPath], 60000);
-          const groqData = await transcribeWithGroq(dubbedAudioPath);
-          try { fs.unlinkSync(dubbedAudioPath); } catch(e) {}
+          const audioForSTT = path.resolve('uploads/stt_audio_'+timestamp+'.mp3');
+          if (provider === 'elevenlabs') {
+            // audioPath is already mp3
+            fs.copyFileSync(audioPath, audioForSTT);
+          } else {
+            // Extract audio from dubbed video
+            runFFmpeg(['-y','-i',dubbedVideoPath,'-vn','-ar','16000','-ac','1','-b:a','64k',audioForSTT], 60000);
+          }
+          const groqData = await transcribeWithGroq(audioForSTT);
+          try { fs.unlinkSync(audioForSTT); } catch(e) {}
           console.log('Groq transcript:', groqData.text?.slice(0,100));
 
           if (groqData.words && groqData.words.length > 0) {
-            // Use word-level timestamps from Groq
             groqData.words.forEach(w => {
               cues.push({ start: w.start, end: w.end, text: w.word.trim() });
             });
-            console.log(`Built ${cues.length} word-level cues from Groq`);
+            console.log(`Built ${cues.length} word-level cues`);
           } else if (groqData.text) {
-            // Fallback: even distribution
-            const probeResult = spawnSync(FFMPEG_PATH, ['-i', audioPath, '-f', 'null', '-'], { encoding: 'utf8' });
-            const durMatch = (probeResult.stderr||'').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
+            const probeRes = spawnSync(FFMPEG_PATH, ['-i', provider === 'elevenlabs' ? audioPath : dubbedVideoPath, '-f', 'null', '-'], { encoding: 'utf8' });
+            const durMatch = (probeRes.stderr||'').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
             const totalDur = durMatch ? parseInt(durMatch[1])*3600+parseInt(durMatch[2])*60+parseFloat(durMatch[3]) : 30;
             const words = groqData.text.trim().split(/\s+/).filter(w => w.length > 0);
             const wordDur = totalDur / words.length;
-            words.forEach((word, i) => {
-              cues.push({ start: i*wordDur, end: (i+1)*wordDur, text: word });
-            });
+            words.forEach((word, i) => cues.push({ start: i*wordDur, end: (i+1)*wordDur, text: word }));
             console.log(`Built ${cues.length} evenly-spaced cues`);
           }
         } catch(e) { console.log('Transcription failed:', e.message); }
       }
 
-      let videoForMerge = audioPath;
+      // VIDEO SOURCE for frame extraction and final merge
+      // For elevenlabs: cleanVideoPath has the video (no audio)
+      // For modelslab: dubbedVideoPath has video+audio
+      const videoSource = provider === 'elevenlabs' ? cleanVideoPath : dubbedVideoPath;
+      let videoForMerge = videoSource;
 
+      // Burn captions if needed
       if (cues.length > 0) {
         console.log('Extracting frames...');
         fs.mkdirSync(framesDir, { recursive: true });
         const captionFps = Math.min(fps, 24);
-        runFFmpeg(['-y','-i',videoForMerge,'-vf',`fps=${captionFps}`,'-q:v','3','-threads','2',path.join(framesDir,'frame%06d.jpg')], 300000);
+        runFFmpeg(['-y','-i',videoSource,'-vf',`fps=${captionFps}`,'-q:v','3','-threads','2',path.join(framesDir,'frame%06d.jpg')], 300000);
         console.log('Burning captions...');
         await burnCaptionsOnFrames(framesDir, cues, vidW, vidH, captionFps, captionStyle);
         console.log('Reassembling...');
@@ -494,22 +454,25 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         console.log('Captions burned!');
       }
 
+      // Final merge
       console.log('Final merge...');
       if (provider === 'elevenlabs') {
-        // ElevenLabs returns full dubbed video - extract its audio then merge with our video (which has captions)
-        const elevenAudioPath = path.resolve('uploads/eleven_audio_'+timestamp+'.aac');
-        runFFmpeg(['-y','-i',audioPath,'-vn','-c:a','aac','-b:a','128k',elevenAudioPath], 60000);
-        console.log('Extracted ElevenLabs audio, merging with video...');
-        runFFmpeg(['-y','-i',videoForMerge,'-i',elevenAudioPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
-        try { fs.unlinkSync(elevenAudioPath); } catch(e) {}
+        // videoForMerge = captioned video (no audio) OR cleanVideoPath
+        // audioPath = dubbed audio mp3 from ElevenLabs
+        runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
       } else {
-        runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a?','-c:v','copy','-c:a','aac','-shortest',outputPath]);
+        // videoForMerge = captioned video (no audio) OR dubbedVideoPath (has audio)
+        if (videoForMerge === dubbedVideoPath) {
+          // No captions burned, just re-encode dubbedVideoPath
+          runFFmpeg(['-y','-i',dubbedVideoPath,'-c:v','copy','-c:a','aac',outputPath]);
+        } else {
+          // Captions burned - merge captioned video with dubbed video's audio
+          runFFmpeg(['-y','-i',videoForMerge,'-i',dubbedVideoPath,'-map','0:v','-map','1:a?','-c:v','copy','-c:a','aac','-shortest',outputPath]);
+        }
       }
       console.log('Done!');
 
-      // Cache result
       setCachedResult(cacheKey, outputPath);
-
       allFiles.forEach(f=>{ try { if(fs.existsSync(f)) fs.unlinkSync(f); } catch(e){} });
       setTimeout(()=>{ try { if(fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch(e){} }, 600000);
       return { success: true, videoUrl: '/outputs/final_'+timestamp+'.mp4' };
@@ -525,7 +488,6 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   }
 });
 
-// Queue status endpoint
 app.get('/queue', (req, res) => {
   res.json({ active: activeJobs, waiting: queue.length, max: MAX_CONCURRENT });
 });
