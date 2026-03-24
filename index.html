@@ -410,9 +410,6 @@ function savePreset() {
     language: document.getElementById('langSelect').value,
     removeCaption: document.getElementById('removeToggle').checked,
     addCaption: document.getElementById('addToggle').checked,
-    captionBox: captionBox,
-    stylePanelCollapsed: document.getElementById('styleInner') ? document.getElementById('styleInner').style.display === 'none' : false,
-    v: 2,
   };
   localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
   const btn = document.getElementById('savePresetBtn');
@@ -424,11 +421,6 @@ function loadPreset() {
   try {
     const preset = JSON.parse(localStorage.getItem('dubshorts_preset'));
     if (!preset) return;
-    // Clear old preset format
-    if (!preset.v || preset.v < 2) {
-      localStorage.removeItem('dubshorts_preset');
-      return;
-    }
     if (preset.yPct !== undefined) { captionYPct = preset.yPct; document.getElementById('yPos').value = preset.yPct; document.getElementById('yposVal').textContent = preset.yPct + '%'; }
     if (preset.fontFamily) document.getElementById('fontFamily').value = preset.fontFamily;
     if (preset.fontSize) { document.getElementById('fontSize').value = preset.fontSize; document.getElementById('sizeVal').textContent = preset.fontSize + '%'; }
@@ -442,17 +434,8 @@ function loadPreset() {
     if (preset.highlightColor) document.getElementById('highlightColor').value = preset.highlightColor;
     if (preset.provider) setProvider(preset.provider);
     if (preset.language) document.getElementById('langSelect').value = preset.language;
-    if (preset.addCaption !== undefined) { document.getElementById('addToggle').checked = preset.addCaption; onAdd(); }
-    if (preset.removeCaption !== undefined) { document.getElementById('removeToggle').checked = preset.removeCaption; onRemove(); }
-    if (preset.captionBox) { captionBox = preset.captionBox; if (document.getElementById('clearBtn')) { document.getElementById('clearBtn').style.display = 'block'; } drawOverlay(); }
-    if (preset.stylePanelCollapsed !== undefined) {
-      const inner = document.getElementById('styleInner');
-      const arrow = document.getElementById('styleArrow');
-      if (inner && arrow) {
-        inner.style.display = preset.stylePanelCollapsed ? 'none' : 'block';
-        arrow.textContent = preset.stylePanelCollapsed ? '▶' : '▼';
-      }
-    }
+    if (preset.removeCaption) { document.getElementById('removeToggle').checked = true; onRemove(); }
+    if (preset.addCaption) { document.getElementById('addToggle').checked = true; onAdd(); }
   } catch(e) {}
 }
 
