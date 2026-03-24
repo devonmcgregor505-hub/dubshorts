@@ -232,7 +232,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
         <div class="ypos-row">
           <div class="ypos-lbl"><span>Vertical Position</span><span id="yposVal">75%</span></div>
-          <input type="range" id="yPos" min="5" max="95" value="75" step="1" style="width:100%;accent-color:var(--y);" oninput="onYPos()">
+          <input type="range" id="yPos" min="5" max="95" value="70" step="1" style="width:100%;accent-color:var(--y);" oninput="onYPos()">
           <div class="ypos-marks"><span>Top</span><span>Center</span><span>Bottom</span></div>
         </div>
 
@@ -242,7 +242,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
             <select id="fontFamily" onchange="drawOverlay()">
               <option value="CaptionFont">DejaVu Bold</option>
               <option value="serif">Serif</option>
-              <option value="sans-serif">Sans-serif</option>
+              <option value="sans-serif" selected>Sans-serif</option>
               <option value="monospace">Monospace</option>
             </select>
           </div>
@@ -268,7 +268,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
         <div class="sg2">
           <div class="sfi">
             <label>Size <span class="rv" id="sizeVal">5%</span></label>
-            <div class="rr"><input type="range" id="fontSize" min="2" max="12" value="5" step=".5" oninput="document.getElementById('sizeVal').textContent=this.value+'%';drawOverlay()"></div>
+            <div class="rr"><input type="range" id="fontSize" min="2" max="12" value="4" step=".5" oninput="document.getElementById('sizeVal').textContent=this.value+'%';drawOverlay()"></div>
           </div>
           <div class="sfi">
             <label>Outline <span class="rv" id="outlineVal">15%</span></label>
@@ -338,7 +338,7 @@ const ctx = selCanvas.getContext('2d');
 const previewVideo = document.getElementById('previewVideo');
 const phoneWrap = document.getElementById('phoneWrap');
 let captionBox = null, isDrawing = false, sx = 0, sy = 0;
-let captionYPct = 75;
+let captionYPct = 70;
 let progInterval = null;
 
 function fitCanvas() {
