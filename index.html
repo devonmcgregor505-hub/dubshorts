@@ -223,7 +223,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
             <div class="tc-desc">Draw box over captions</div>
           </div>
           <label class="tog" onclick="event.stopPropagation()">
-            <input type="checkbox" id="removeToggle" onchange="onRemove()">
+            <input type="checkbox" id="removeToggle" onchange="onRemove();autoSave();">
             <div class="tog-track"></div>
             <div class="tog-thumb"></div>
           </label>
@@ -235,7 +235,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
             <div class="tc-desc">Translated subtitles</div>
           </div>
           <label class="tog" onclick="event.stopPropagation()">
-            <input type="checkbox" id="addToggle" onchange="onAdd()">
+            <input type="checkbox" id="addToggle" onchange="onAdd();autoSave();">
             <div class="tog-track"></div>
             <div class="tog-thumb"></div>
           </label>
@@ -393,6 +393,12 @@ let progInterval = null;
 let progStartTime = null;
 
 // ── PRESET ───────────────────────────────────────────────────────────────────
+function autoSave() {
+  const existing = JSON.parse(localStorage.getItem('dubshorts_preset') || '{}');
+  existing.removeCaption = document.getElementById('removeToggle').checked;
+  existing.addCaption = document.getElementById('addToggle').checked;
+  localStorage.setItem('dubshorts_preset', JSON.stringify(existing));
+}
 function savePreset() {
   const preset = {
     yPct: captionYPct,
