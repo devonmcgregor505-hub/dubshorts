@@ -1,5 +1,11 @@
 [phases.setup]
-nixPkgs = ["ffmpeg", "dejavu_fonts", "python311", "python311Packages.pip"]
+nixPkgs = ["nodejs_22", "npm-10_x", "ffmpeg", "dejavu_fonts", "python311", "python311Packages.pip"]
 
 [phases.install]
-cmds = ["npm ci", "python3 -m pip install simple-lama-inpainting opencv-python-headless numpy Pillow --break-system-packages"]
+cmds = [
+  "npm ci",
+  "python3 -m pip install opencv-python-headless numpy Pillow --break-system-packages"
+]
+
+[start]
+cmd = "npm start"
