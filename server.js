@@ -434,6 +434,17 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
       fs.writeFileSync(audioPath, dubbedData);
       console.log('Dubbing complete!');
+      // Extract audio from ElevenLabs response if it's audio-only
+      if (provider === 'elevenlabs') {
+        const elevenAudioPath = path.resolve('uploads/eleven_audio_'+timestamp+'.mp3');
+        try {
+          runFFmpeg(['-y','-i',audioPath,'-vn','-c:a','copy',elevenAudioPath], 30000);
+          fs.copyFileSync(elevenAudioPath, audioPath);
+          try { fs.unlinkSync(elevenAudioPath); } catch(e) {}
+        } catch(e) {
+          console.log('Audio extraction note:', e.message);
+        }
+      }
 
       // Transcription with Groq
       let cues = [];
@@ -484,7 +495,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
 
       console.log('Final merge...');
-      runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a?','-c:v','copy','-c:a','aac','-shortest',outputPath]);
+      const videoSource = (provider === 'elevenlabs' && videoForMerge === audioPath) ? cleanVideoPath : videoForMerge;
+      runFFmpeg(['-y','-i',videoSource,'-i',audioPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath]);
       console.log('Done!');
 
       // Cache result
