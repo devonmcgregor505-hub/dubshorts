@@ -210,7 +210,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
     } else if (dubRes.data.status === 'processing' && dubRes.data.fetch_result) {
       console.log('Processing, polling for result...');
       let attempts = 0;
-      while (attempts < 60) {
+      while (attempts < 120) {
         await new Promise(r => setTimeout(r, 5000));
         attempts++;
         const pollRes = await axios.post(dubRes.data.fetch_result, { key: process.env.MODELSLAB_API_KEY }, { headers: { 'Content-Type': 'application/json' } });
