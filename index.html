@@ -329,6 +329,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
       <!-- Save Preset -->
       <button class="preset-btn" id="savePresetBtn" onclick="savePreset()">💾 Save Preset</button>
+      <button class="preset-btn" style="background:red;color:white;" onclick="localStorage.removeItem('dubshorts_preset');location.reload()">🗑 Clear Preset</button>
 
       <!-- Translate button -->
       <button class="submit" id="translateBtn" onclick="startTranslation()">→ Translate to Spanish</button>
