@@ -268,9 +268,18 @@ async function dubWithElevenLabs(videoUrl, targetLang, localVideoPath) {
   const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
   const lang = langMap[targetLang] || 'es';
 
-  // Upload file directly to ElevenLabs
+  // Re-encode to h264 so ElevenLabs can process it
+  const elevenEncodedPath = localVideoPath.replace('.mp4', '_h264.mp4');
+  const { spawnSync: spawnSyncEl } = require('child_process');
+  const encodeRes = spawnSyncEl(process.env.PATH ? '/usr/bin/ffmpeg' : require('ffmpeg-static'), 
+    ['-y','-i',localVideoPath,'-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k',elevenEncodedPath],
+    { encoding: 'utf8', timeout: 60000 }
+  );
+  const uploadPath = (encodeRes.status === 0 && require('fs').existsSync(elevenEncodedPath)) ? elevenEncodedPath : localVideoPath;
+  console.log('ElevenLabs upload path:', uploadPath, 'encode status:', encodeRes.status);
+
   const elevenForm = new FormData();
-  elevenForm.append('file', fs.createReadStream(localVideoPath), { filename: 'video.mp4', contentType: 'video/mp4' });
+  elevenForm.append('file', fs.createReadStream(uploadPath), { filename: 'video.mp4', contentType: 'video/mp4' });
   elevenForm.append('target_lang', lang);
   elevenForm.append('source_lang', 'en');
   elevenForm.append('mode', 'automatic');
