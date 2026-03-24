@@ -462,7 +462,11 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       if (provider === 'elevenlabs') {
         // videoForMerge = captioned video (no audio) OR cleanVideoPath
         // audioPath = dubbed audio mp3 from ElevenLabs
-        runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-ar','44100','-shortest',outputPath], 180000);
+        const elevenAacPath = audioPath.replace('.mp3', '.aac');
+        runFFmpeg(['-y','-i',audioPath,'-c:a','aac','-b:a','128k',elevenAacPath], 30000);
+        console.log('Converted to AAC, merging...');
+        runFFmpeg(['-y','-i',videoForMerge,'-i',elevenAacPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','copy','-shortest',outputPath], 180000);
+        try { fs.unlinkSync(elevenAacPath); } catch(e) {}
       } else {
         // videoForMerge = captioned video (no audio) OR dubbedVideoPath (has audio)
         if (videoForMerge === dubbedVideoPath) {
