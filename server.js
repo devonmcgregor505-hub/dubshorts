@@ -268,32 +268,26 @@ async function dubWithElevenLabs(videoUrl, targetLang, localVideoPath) {
   const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
   const lang = langMap[targetLang] || 'es';
 
-  // ElevenLabs needs a reliable URL - upload directly as file
-  const elevenUploadForm = new FormData();
-  elevenUploadForm.append('file', fs.createReadStream(localVideoPath), { filename: 'video.mp4', contentType: 'video/mp4' });
-  const elevenFileRes = await axios.post('https://file.io/?expires=1d', elevenUploadForm, {
-    headers: elevenUploadForm.getHeaders(), timeout: 120000
-  });
-  console.log('file.io response:', JSON.stringify(elevenFileRes.data).slice(0,200));
-  const elevenVideoUrl = elevenFileRes.data.link || elevenFileRes.data.url;
-  console.log('ElevenLabs video URL:', elevenVideoUrl);
-
+  // Upload file directly to ElevenLabs
   const elevenForm = new FormData();
-  elevenForm.append('source_url', elevenVideoUrl);
+  elevenForm.append('file', fs.createReadStream(localVideoPath), { filename: 'video.mp4', contentType: 'video/mp4' });
   elevenForm.append('target_lang', lang);
   elevenForm.append('source_lang', 'en');
   elevenForm.append('mode', 'automatic');
   elevenForm.append('num_speakers', '0');
   elevenForm.append('watermark', 'false');
+  elevenForm.append('highest_resolution', 'true');
+
   const startRes = await axios.post('https://api.elevenlabs.io/v1/dubbing', elevenForm, {
     headers: { ...elevenForm.getHeaders(), 'xi-api-key': process.env.ELEVENLABS_API_KEY },
-    timeout: 30000
+    timeout: 120000,
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity
   });
 
   const dubbingId = startRes.data.dubbing_id;
   console.log('ElevenLabs dubbing ID:', dubbingId);
 
-  // Poll for completion
   for (let i = 0; i < 60; i++) {
     await new Promise(r => setTimeout(r, 5000));
     const status = await axios.get(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}`, {
@@ -301,7 +295,6 @@ async function dubWithElevenLabs(videoUrl, targetLang, localVideoPath) {
     });
     console.log(`ElevenLabs poll ${i+1}: ${status.data.status}`);
     if (status.data.status === 'dubbed') {
-      // Download
       const dlRes = await axios.get(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}/audio/${lang}`, {
         headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY },
         responseType: 'arraybuffer',
