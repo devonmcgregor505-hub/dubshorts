@@ -384,7 +384,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         // ElevenLabs: upload video file, get back audio-only mp3
         const audioData = await dubWithElevenLabs(targetLang, cleanVideoPath, timestamp);
         fs.writeFileSync(audioPath, audioData);
-        console.log('ElevenLabs dubbing complete! Audio saved.');
+        // Probe what we got
+      const probeAudio = require('child_process').spawnSync('/usr/bin/ffmpeg', ['-i', audioPath], { encoding: 'utf8' });
+      console.log('Audio probe:', (probeAudio.stderr||'').slice(200, 600));
+      console.log('ElevenLabs dubbing complete! Audio saved.');
       } else {
         // ModelsLab: upload via URL, get back full dubbed video mp4
         console.log('Uploading to temp storage...');
