@@ -152,9 +152,57 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       console.log('Video:', vidW, 'x', vidH, '@', fps, 'fps');
     } catch(e) {}
 
+    // Run WaveSpeed caption removal on original video FIRST
+    let cleanVideoPath = videoPath;
+    if (removeCaption) {
+      console.log('WaveSpeed AI caption removal on original video...');
+      // Upload original video to WaveSpeed
+      const wsUploadForm = new FormData();
+      wsUploadForm.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: 'video/mp4' });
+      const wsUploadRes = await axios.post('https://api.wavespeed.ai/api/v3/media/upload/binary', wsUploadForm, {
+        headers: { ...wsUploadForm.getHeaders(), 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
+        timeout: 120000
+      });
+      const wsVideoUrl = wsUploadRes.data.data.download_url;
+      console.log('WaveSpeed video URL:', wsVideoUrl);
+
+      const wsJobRes = await axios.post('https://api.wavespeed.ai/api/v3/wavespeed-ai/video-watermark-remover', {
+        video: wsVideoUrl
+      }, {
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
+        timeout: 30000
+      });
+      const wsJobId = wsJobRes.data.data?.id || wsJobRes.data.id;
+      console.log('WaveSpeed job ID:', wsJobId);
+
+      let wsResult = null;
+      for (let attempt = 0; attempt < 60; attempt++) {
+        await new Promise(r => setTimeout(r, 5000));
+        const wsCheck = await axios.get(`https://api.wavespeed.ai/api/v3/predictions/${wsJobId}/result`, {
+          headers: { 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
+          timeout: 15000
+        });
+        const wsStatus = wsCheck.data.data?.status || wsCheck.data.status;
+        const wsOutputs = wsCheck.data.data?.outputs || wsCheck.data.outputs;
+        console.log(`WaveSpeed poll ${attempt + 1}: ${wsStatus}`);
+        if ((wsStatus === 'completed' || wsStatus === 'succeeded') && wsOutputs && wsOutputs[0]) {
+          wsResult = wsOutputs[0];
+          break;
+        } else if (wsStatus === 'failed') {
+          throw new Error('WaveSpeed failed: ' + JSON.stringify(wsCheck.data));
+        }
+      }
+      if (!wsResult) throw new Error('WaveSpeed timed out');
+      console.log('WaveSpeed done! Downloading clean video...');
+      const wsVideoRes = await axios.get(wsResult, { responseType: 'arraybuffer', timeout: 120000 });
+      cleanVideoPath = path.resolve('uploads/clean_'+timestamp+'.mp4');
+      fs.writeFileSync(cleanVideoPath, wsVideoRes.data);
+      console.log('Clean video ready for dubbing');
+    }
+
     console.log('Step 1: Uploading to temp storage...');
     const uploadForm = new FormData();
-    uploadForm.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
+    uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
     const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
     const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
     console.log('Video URL:', videoUrl);
@@ -257,61 +305,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
     let videoForMerge = audioPath; // audioPath now holds the complete dubbed video from ModelsLab
 
-    if (removeCaption) {
-      console.log('WaveSpeed AI caption removal...');
-      // WaveSpeed processes full video - no box needed
 
-      // Upload video to WaveSpeed
-      console.log('Uploading video to WaveSpeed...');
-      const wsUploadForm = new FormData();
-      wsUploadForm.append('file', fs.createReadStream(videoPath), { filename: req.file.originalname, contentType: 'video/mp4' });
-      const wsUploadRes = await axios.post('https://api.wavespeed.ai/api/v3/media/upload/binary', wsUploadForm, {
-        headers: { ...wsUploadForm.getHeaders(), 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
-        timeout: 120000
-      });
-      const wsVideoUrl = wsUploadRes.data.data.download_url;
-      console.log('WaveSpeed video URL:', wsVideoUrl);
-
-      // Submit watermark removal job
-      console.log('Submitting WaveSpeed removal job...');
-      const wsJobRes = await axios.post('https://api.wavespeed.ai/api/v3/wavespeed-ai/video-watermark-remover', {
-        video: wsVideoUrl
-      }, {
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
-        timeout: 30000
-      });
-      console.log('WaveSpeed full response:', JSON.stringify(wsJobRes.data).slice(0,300));
-      const wsJobId = wsJobRes.data.id || wsJobRes.data.data?.id || wsJobRes.data.request_id;
-      console.log('WaveSpeed job ID:', wsJobId);
-
-      // Poll for result
-      let wsResult = null;
-      for (let attempt = 0; attempt < 60; attempt++) {
-        await new Promise(r => setTimeout(r, 5000));
-        const wsCheck = await axios.get(`https://api.wavespeed.ai/api/v3/predictions/${wsJobId}/result`, {
-          headers: { 'Authorization': `Bearer ${process.env.WAVESPEED_API_KEY}` },
-          timeout: 15000
-        });
-        const wsData = wsCheck.data.data || wsCheck.data;
-        console.log(`WaveSpeed poll ${attempt + 1}: ${wsData.status}`);
-        if (wsData.status === 'completed' && wsData.outputs && wsData.outputs[0]) {
-          wsResult = wsData.outputs[0];
-          break;
-        } else if (wsData.status === 'failed') {
-          throw new Error('WaveSpeed removal failed: ' + wsData.error);
-        }
-      }
-
-      if (!wsResult) throw new Error('WaveSpeed timed out');
-      console.log('WaveSpeed removal complete! Downloading...');
-
-      // Download cleaned video
-      const wsVideoRes = await axios.get(wsResult, { responseType: 'arraybuffer', timeout: 120000 });
-      fs.writeFileSync(blurredPath, wsVideoRes.data);
-      videoForMerge = blurredPath;
-      console.log('WaveSpeed removal done!');
-      console.log('Blur done!');
-    }
 
     if (cues.length > 0) {
       console.log('Extracting frames...');
