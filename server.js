@@ -434,6 +434,9 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
       fs.writeFileSync(audioPath, dubbedData);
       console.log('Dubbing complete!');
+      // Probe ElevenLabs output to understand format
+      const probeEleven = spawnSync(FFMPEG_PATH, ['-i', audioPath], { encoding: 'utf8' });
+      console.log('ElevenLabs output probe:', (probeEleven.stderr||'').slice(0,500));
 
 
       // Transcription with Groq
