@@ -403,6 +403,7 @@ function savePreset() {
     language: document.getElementById('langSelect').value,
     removeCaption: document.getElementById('removeToggle').checked,
     addCaption: document.getElementById('addToggle').checked,
+    captionBox: captionBox,
   };
   localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
 
@@ -431,6 +432,12 @@ function loadPreset() {
     if (preset.language) document.getElementById('langSelect').value = preset.language;
     if (preset.removeCaption) { document.getElementById('removeToggle').checked = true; onRemove(); }
     if (preset.addCaption) { document.getElementById('addToggle').checked = true; onAdd(); }
+    if (preset.captionBox) {
+      captionBox = preset.captionBox;
+      const clearBtn = document.getElementById('clearBtn');
+      if (clearBtn) clearBtn.style.display = 'flex';
+      drawOverlay();
+    }
   } catch(e) { console.error('loadPreset error:', e); }
 }
 
@@ -440,8 +447,6 @@ function setProvider(p) {
   document.querySelectorAll('.provider-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.provider === p);
   });
-  document.getElementById('btnModels').classList.toggle('active', p === 'modelslab');
-  document.getElementById('btnEleven').classList.toggle('active', p === 'elevenlabs');
 }
 
 // ── CAPTION MODE ─────────────────────────────────────────────────────────────
@@ -479,11 +484,14 @@ fileInput.addEventListener('change', () => {
 });
 
 document.getElementById('langSelect').addEventListener('change', function(){ updateTranslateBtn(); savePreset(); });
+document.getElementById('removeToggle').addEventListener('change', function(){ savePreset(); });
+document.getElementById('addToggle').addEventListener('change', function(){ savePreset(); });
 
 function updateTranslateBtn() {
-  const langNames = { es:'Spanish', hi:'Hindi', pt:'Portuguese', ja:'Japanese', fr:'French', pl:'Polish' };
   const lang = document.getElementById('langSelect').value;
-  document.getElementById('translateBtn').textContent = `→ Translate to ${langNames[lang] || lang}`;
+  const langNames = { none: 'English (No Translation)', es: 'Spanish', hi: 'Hindi', pt: 'Portuguese', ja: 'Japanese', fr: 'French', pl: 'Polish' };
+  const btn = document.getElementById('translateBtn');
+  if (btn) btn.textContent = '→ ' + (langNames[lang] || lang);
 }
 
 window.addEventListener('resize', fitCanvas);
