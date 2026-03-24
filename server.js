@@ -498,8 +498,12 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
       console.log('Final merge...');
       if (provider === 'elevenlabs') {
-        // ElevenLabs returns full dubbed video - use it directly
-        runFFmpeg(['-y','-i',videoForMerge,'-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',outputPath]);
+        // ElevenLabs returns full dubbed video - extract its audio then merge with our video (which has captions)
+        const elevenAudioPath = path.resolve('uploads/eleven_audio_'+timestamp+'.aac');
+        runFFmpeg(['-y','-i',audioPath,'-vn','-c:a','aac','-b:a','128k',elevenAudioPath], 60000);
+        console.log('Extracted ElevenLabs audio, merging with video...');
+        runFFmpeg(['-y','-i',videoForMerge,'-i',elevenAudioPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
+        try { fs.unlinkSync(elevenAudioPath); } catch(e) {}
       } else {
         runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a?','-c:v','copy','-c:a','aac','-shortest',outputPath]);
       }
