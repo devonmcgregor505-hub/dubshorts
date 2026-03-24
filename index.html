@@ -408,10 +408,11 @@ function savePreset() {
     highlightColor: document.getElementById('highlightColor').value,
     provider: selectedProvider,
     language: document.getElementById('langSelect').value,
-    addCaptions: document.getElementById('addToggle').checked,
-    removeCaptions: document.getElementById('removeToggle').checked,
+    removeCaption: document.getElementById('removeToggle').checked,
+    addCaption: document.getElementById('addToggle').checked,
     captionBox: captionBox,
     stylePanelCollapsed: document.getElementById('styleInner') ? document.getElementById('styleInner').style.display === 'none' : false,
+    v: 2,
   };
   localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
   const btn = document.getElementById('savePresetBtn');
@@ -423,10 +424,9 @@ function loadPreset() {
   try {
     const preset = JSON.parse(localStorage.getItem('dubshorts_preset'));
     if (!preset) return;
-    // Migrate old presets that lack new fields
-    if (preset.addCaptions === undefined && preset.removeCaptions === undefined && preset.captionBox === undefined) {
+    // Clear old preset format
+    if (!preset.v || preset.v < 2) {
       localStorage.removeItem('dubshorts_preset');
-      console.log('Old preset cleared, please re-save your preset.');
       return;
     }
     if (preset.yPct !== undefined) { captionYPct = preset.yPct; document.getElementById('yPos').value = preset.yPct; document.getElementById('yposVal').textContent = preset.yPct + '%'; }
@@ -442,8 +442,8 @@ function loadPreset() {
     if (preset.highlightColor) document.getElementById('highlightColor').value = preset.highlightColor;
     if (preset.provider) setProvider(preset.provider);
     if (preset.language) document.getElementById('langSelect').value = preset.language;
-    if (preset.addCaptions !== undefined) { document.getElementById('addToggle').checked = preset.addCaptions; onAdd(); }
-    if (preset.removeCaptions !== undefined) { document.getElementById('removeToggle').checked = preset.removeCaptions; onRemove(); }
+    if (preset.addCaption !== undefined) { document.getElementById('addToggle').checked = preset.addCaption; onAdd(); }
+    if (preset.removeCaption !== undefined) { document.getElementById('removeToggle').checked = preset.removeCaption; onRemove(); }
     if (preset.captionBox) { captionBox = preset.captionBox; if (document.getElementById('clearBtn')) { document.getElementById('clearBtn').style.display = 'block'; } drawOverlay(); }
     if (preset.stylePanelCollapsed !== undefined) {
       const inner = document.getElementById('styleInner');
