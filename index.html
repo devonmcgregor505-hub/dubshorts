@@ -393,58 +393,6 @@ let progInterval = null;
 let progStartTime = null;
 
 // ── PRESET ───────────────────────────────────────────────────────────────────
-function autoSave() {
-  const preset = {
-    yPct: captionYPct,
-    fontFamily: document.getElementById('fontFamily').value,
-    fontSize: document.getElementById('fontSize').value,
-    textStyle: document.getElementById('textStyle').value,
-    textCase: document.getElementById('textCase').value,
-    textColor: document.getElementById('textColor').value,
-    outlineColor: document.getElementById('outlineColor').value,
-    outlineWidth: document.getElementById('outlineWidth').value,
-    shadowSize: document.getElementById('shadowSize').value,
-    captionMode: captionMode,
-    highlightColor: document.getElementById('highlightColor').value,
-    provider: selectedProvider,
-    language: document.getElementById('langSelect').value,
-    removeCaption: document.getElementById('removeToggle').checked,
-    addCaption: document.getElementById('addToggle').checked,
-  };
-  const str = JSON.stringify(preset);
-  // Try all storage methods
-  try { localStorage.setItem('ds_preset', str); } catch(e) {}
-  try { sessionStorage.setItem('ds_preset', str); } catch(e) {}
-  try { document.cookie = 'ds_preset=' + encodeURIComponent(str) + ';path=/;max-age=31536000;SameSite=Lax'; } catch(e) {}
-  try { if(window.indexedDB) {
-    const req = indexedDB.open('dubshorts', 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore('settings');
-    req.onsuccess = e => {
-      const tx = e.target.result.transaction('settings', 'readwrite');
-      tx.objectStore('settings').put(str, 'preset');
-    };
-  }} catch(e) {}
-}
-
-function loadFromAnyStorage(cb) {
-  // Try localStorage first
-  try { const v = localStorage.getItem('ds_preset'); if(v) return cb(JSON.parse(v)); } catch(e) {}
-  // Try cookie
-  try {
-    const match = document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('ds_preset='));
-    if(match) return cb(JSON.parse(decodeURIComponent(match.split('=').slice(1).join('='))));
-  } catch(e) {}
-  // Try indexedDB
-  try { if(window.indexedDB) {
-    const req = indexedDB.open('dubshorts', 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore('settings');
-    req.onsuccess = e => {
-      const tx = e.target.result.transaction('settings', 'readonly');
-      const gr = tx.objectStore('settings').get('preset');
-      gr.onsuccess = () => { if(gr.result) cb(JSON.parse(gr.result)); };
-    };
-  }} catch(e) {}
-}
 function savePreset() {
   const preset = {
     yPct: captionYPct,
@@ -469,28 +417,26 @@ function savePreset() {
   setTimeout(() => btn.textContent = '💾 Save Preset', 2000);
 }
 
-function applyPreset(preset) {
-  if (!preset) return;
-  if (preset.yPct !== undefined) { captionYPct = preset.yPct; document.getElementById('yPos').value = preset.yPct; document.getElementById('yposVal').textContent = preset.yPct + '%'; }
-  if (preset.fontFamily) document.getElementById('fontFamily').value = preset.fontFamily;
-  if (preset.fontSize) { document.getElementById('fontSize').value = preset.fontSize; document.getElementById('sizeVal').textContent = preset.fontSize + '%'; }
-  if (preset.textStyle) document.getElementById('textStyle').value = preset.textStyle;
-  if (preset.textCase) document.getElementById('textCase').value = preset.textCase;
-  if (preset.textColor) document.getElementById('textColor').value = preset.textColor;
-  if (preset.outlineColor) document.getElementById('outlineColor').value = preset.outlineColor;
-  if (preset.outlineWidth) { document.getElementById('outlineWidth').value = preset.outlineWidth; document.getElementById('outlineVal').textContent = preset.outlineWidth + '%'; }
-  if (preset.shadowSize) { document.getElementById('shadowSize').value = preset.shadowSize; document.getElementById('shadowVal').textContent = preset.shadowSize + '%'; }
-  if (preset.captionMode) setMode(preset.captionMode);
-  if (preset.highlightColor) document.getElementById('highlightColor').value = preset.highlightColor;
-  if (preset.provider) setProvider(preset.provider);
-  if (preset.language) document.getElementById('langSelect').value = preset.language;
-  document.getElementById('removeToggle').checked = preset.removeCaption === true;
-  onRemove();
-  document.getElementById('addToggle').checked = preset.addCaption === true;
-  onAdd();
-}
 function loadPreset() {
-  loadFromAnyStorage(applyPreset);
+  try {
+    const preset = JSON.parse(localStorage.getItem('dubshorts_preset'));
+    if (!preset) return;
+    if (preset.yPct !== undefined) { captionYPct = preset.yPct; document.getElementById('yPos').value = preset.yPct; document.getElementById('yposVal').textContent = preset.yPct + '%'; }
+    if (preset.fontFamily) document.getElementById('fontFamily').value = preset.fontFamily;
+    if (preset.fontSize) { document.getElementById('fontSize').value = preset.fontSize; document.getElementById('sizeVal').textContent = preset.fontSize + '%'; }
+    if (preset.textStyle) document.getElementById('textStyle').value = preset.textStyle;
+    if (preset.textCase) document.getElementById('textCase').value = preset.textCase;
+    if (preset.textColor) document.getElementById('textColor').value = preset.textColor;
+    if (preset.outlineColor) document.getElementById('outlineColor').value = preset.outlineColor;
+    if (preset.outlineWidth) { document.getElementById('outlineWidth').value = preset.outlineWidth; document.getElementById('outlineVal').textContent = preset.outlineWidth + '%'; }
+    if (preset.shadowSize) { document.getElementById('shadowSize').value = preset.shadowSize; document.getElementById('shadowVal').textContent = preset.shadowSize + '%'; }
+    if (preset.captionMode) setMode(preset.captionMode);
+    if (preset.highlightColor) document.getElementById('highlightColor').value = preset.highlightColor;
+    if (preset.provider) setProvider(preset.provider);
+    if (preset.language) document.getElementById('langSelect').value = preset.language;
+    if (preset.removeCaption) { document.getElementById('removeToggle').checked = true; onRemove(); }
+    if (preset.addCaption) { document.getElementById('addToggle').checked = true; onAdd(); }
+  } catch(e) {}
 }
 
 // ── PROVIDER ─────────────────────────────────────────────────────────────────
