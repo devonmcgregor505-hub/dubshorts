@@ -414,6 +414,7 @@ function savePreset() {
     removeCaption: document.getElementById('removeToggle').checked,
     addCaption: document.getElementById('addToggle').checked,
     captionBox: captionBox,
+    stylePanelCollapsed: document.getElementById('styleInner') ? document.getElementById('styleInner').style.display === 'none' : false,
   };
   localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
   const btn = document.querySelector('.preset-btn');
@@ -444,6 +445,14 @@ function loadPreset() {
       captionBox = preset.captionBox;
       document.getElementById('clearBtn').style.display = 'block';
       drawOverlay();
+    }
+    if (preset.stylePanelCollapsed !== undefined) {
+      const inner = document.getElementById('styleInner');
+      const arrow = document.getElementById('styleArrow');
+      if (inner && arrow) {
+        inner.style.display = preset.stylePanelCollapsed ? 'none' : 'block';
+        arrow.textContent = preset.stylePanelCollapsed ? '▶' : '▼';
+      }
     }
   } catch(e) {}
 }
