@@ -389,13 +389,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         try {
           console.log('Transcribing with Groq...');
           const audioForSTT = path.resolve('uploads/stt_audio_'+timestamp+'.mp3');
-          if (provider === 'elevenlabs') {
-            // audioPath is already mp3
-            fs.copyFileSync(audioPath, audioForSTT);
-          } else {
-            // Extract audio from dubbed video
-            runFFmpeg(['-y','-i',dubbedVideoPath,'-vn','-ar','16000','-ac','1','-b:a','64k',audioForSTT], 60000);
-          }
+          // Extract audio from original video for STT
+          runFFmpeg(['-y','-i',videoPath,'-vn','-ar','16000','-ac','1','-b:a','64k',audioForSTT], 60000);
           const groqData = await transcribeWithGroq(audioForSTT);
           try { fs.unlinkSync(audioForSTT); } catch(e) {}
           console.log('Groq transcript:', groqData.text?.slice(0,100));
@@ -420,7 +415,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       // VIDEO SOURCE for frame extraction and final merge
       // For elevenlabs: cleanVideoPath has the video (no audio)
       // For modelslab: dubbedVideoPath has video+audio
-      const videoSource = provider === 'elevenlabs' ? cleanVideoPath : dubbedVideoPath;
+      const videoSource = cleanVideoPath;
       let videoForMerge = videoSource;
 
       // Burn captions if needed
