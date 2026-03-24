@@ -410,7 +410,7 @@ function autoSave() {
     removeCaption: document.getElementById('removeToggle').checked,
     addCaption: document.getElementById('addToggle').checked,
   };
-  fetch('/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(preset) });
+  document.cookie = 'dubshorts_preset=' + encodeURIComponent(JSON.stringify(preset)) + ';path=/;max-age=31536000';
 }
 function savePreset() {
   const preset = {
@@ -437,8 +437,11 @@ function savePreset() {
 }
 
 function loadPreset() {
-  fetch('/settings').then(r => r.json()).then(preset => {
-    if (!preset || !Object.keys(preset).length) return;
+  try {
+    const match = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('dubshorts_preset='));
+    if (!match) return;
+    const preset = JSON.parse(decodeURIComponent(match.split('=').slice(1).join('=')));
+    if (!preset) return;
     if (preset.yPct !== undefined) { captionYPct = preset.yPct; document.getElementById('yPos').value = preset.yPct; document.getElementById('yposVal').textContent = preset.yPct + '%'; }
     if (preset.fontFamily) document.getElementById('fontFamily').value = preset.fontFamily;
     if (preset.fontSize) { document.getElementById('fontSize').value = preset.fontSize; document.getElementById('sizeVal').textContent = preset.fontSize + '%'; }
@@ -456,7 +459,7 @@ function loadPreset() {
     onRemove();
     document.getElementById('addToggle').checked = preset.addCaption === true;
     onAdd();
-  }).catch(e => {});
+  } catch(e) {}
 }
 
 // ── PROVIDER ─────────────────────────────────────────────────────────────────
