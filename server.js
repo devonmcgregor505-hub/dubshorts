@@ -268,8 +268,17 @@ async function dubWithElevenLabs(videoUrl, targetLang) {
   const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
   const lang = langMap[targetLang] || 'es';
 
+  // ElevenLabs needs a reliable URL - upload directly as file
+  const elevenUploadForm = new FormData();
+  elevenUploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: 'video.mp4', contentType: 'video/mp4' });
+  const elevenFileRes = await axios.post('https://file.io/?expires=1d', elevenUploadForm, {
+    headers: elevenUploadForm.getHeaders(), timeout: 120000
+  });
+  const elevenVideoUrl = elevenFileRes.data.link;
+  console.log('ElevenLabs video URL:', elevenVideoUrl);
+
   const elevenForm = new FormData();
-  elevenForm.append('source_url', videoUrl);
+  elevenForm.append('source_url', elevenVideoUrl);
   elevenForm.append('target_lang', lang);
   elevenForm.append('source_lang', 'en');
   elevenForm.append('mode', 'automatic');
