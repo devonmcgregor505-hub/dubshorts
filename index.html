@@ -411,6 +411,7 @@ function savePreset() {
     language: document.getElementById('langSelect').value,
     removeCaption: document.getElementById('removeToggle').checked,
     addCaption: document.getElementById('addToggle').checked,
+    captionBox: captionBox,
   };
   localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
   const btn = document.querySelector('.preset-btn');
@@ -437,6 +438,11 @@ function loadPreset() {
     if (preset.language) document.getElementById('langSelect').value = preset.language;
     if (preset.removeCaption) { document.getElementById('removeToggle').checked = true; onRemove(); }
     if (preset.addCaption) { document.getElementById('addToggle').checked = true; onAdd(); }
+    if (preset.captionBox) {
+      captionBox = preset.captionBox;
+      document.getElementById('clearBtn').style.display = 'block';
+      drawOverlay();
+    }
   } catch(e) {}
 }
 
