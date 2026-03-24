@@ -459,7 +459,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       if (provider === 'elevenlabs') {
         // videoForMerge = captioned video (no audio) OR cleanVideoPath
         // audioPath = dubbed audio mp3 from ElevenLabs
-        runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
+        runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-ar','44100','-shortest',outputPath], 180000);
       } else {
         // videoForMerge = captioned video (no audio) OR dubbedVideoPath (has audio)
         if (videoForMerge === dubbedVideoPath) {
