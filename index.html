@@ -328,7 +328,6 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
       </div>
 
       <!-- Save Preset -->
-      <button class="preset-btn" id="savePresetBtn" onclick="savePreset()">💾 Save Preset</button>
 
       <!-- Translate button -->
       <button class="submit" id="translateBtn" onclick="startTranslation()">→ Translate to Spanish</button>
@@ -394,10 +393,24 @@ let progStartTime = null;
 
 // ── PRESET ───────────────────────────────────────────────────────────────────
 function autoSave() {
-  const existing = JSON.parse(localStorage.getItem('dubshorts_preset') || '{}');
-  existing.removeCaption = document.getElementById('removeToggle').checked;
-  existing.addCaption = document.getElementById('addToggle').checked;
-  localStorage.setItem('dubshorts_preset', JSON.stringify(existing));
+  const preset = {
+    yPct: captionYPct,
+    fontFamily: document.getElementById('fontFamily').value,
+    fontSize: document.getElementById('fontSize').value,
+    textStyle: document.getElementById('textStyle').value,
+    textCase: document.getElementById('textCase').value,
+    textColor: document.getElementById('textColor').value,
+    outlineColor: document.getElementById('outlineColor').value,
+    outlineWidth: document.getElementById('outlineWidth').value,
+    shadowSize: document.getElementById('shadowSize').value,
+    captionMode: captionMode,
+    highlightColor: document.getElementById('highlightColor').value,
+    provider: selectedProvider,
+    language: document.getElementById('langSelect').value,
+    removeCaption: document.getElementById('removeToggle').checked,
+    addCaption: document.getElementById('addToggle').checked,
+  };
+  localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
 }
 function savePreset() {
   const preset = {
@@ -491,7 +504,7 @@ fileInput.addEventListener('change', () => {
   updateHint();
 });
 
-document.getElementById('langSelect').addEventListener('change', updateTranslateBtn);
+document.getElementById('langSelect').addEventListener('change', function(){ updateTranslateBtn(); autoSave(); });
 
 function updateTranslateBtn() {
   const langNames = { es:'Spanish', hi:'Hindi', pt:'Portuguese', ja:'Japanese', fr:'French', pl:'Polish' };
