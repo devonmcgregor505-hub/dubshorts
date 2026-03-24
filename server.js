@@ -415,14 +415,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         console.log('Merging video + ElevenLabs audio...');
         runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k','-shortest',outputPath], 180000);
       } else {
-        // videoForMerge = captioned video (no audio) OR dubbedVideoPath (has audio)
-        if (videoForMerge === dubbedVideoPath) {
-          // No captions burned, just re-encode dubbedVideoPath
-          runFFmpeg(['-y','-i',dubbedVideoPath,'-c:v','copy','-c:a','aac',outputPath]);
-        } else {
-          // Captions burned - merge captioned video with dubbed video's audio
-          runFFmpeg(['-y','-i',videoForMerge,'-i',dubbedVideoPath,'-map','0:v','-map','1:a?','-c:v','copy','-c:a','aac','-shortest',outputPath]);
-        }
+        // No dubbing - merge video with original audio from videoPath
+        runFFmpeg(['-y','-i',videoForMerge,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
       }
       console.log('Done!');
 
