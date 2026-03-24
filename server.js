@@ -171,8 +171,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         videoPath, cleanVideoPath,
         String(x), String(y), String(w), String(h)
       ], { encoding: 'utf8', timeout: 300000, maxBuffer: 100*1024*1024 });
-      console.log('LaMa stdout:', lamaResult.stdout?.slice(-500));
-      if (lamaResult.stderr) console.log('LaMa stderr:', lamaResult.stderr?.slice(-300));
+      console.log('LaMa stdout:', lamaResult.stdout?.slice(-1000) || 'EMPTY');
+      console.log('LaMa stderr tail:', lamaResult.stderr?.slice(-500) || 'EMPTY');
+      console.log('LaMa exit code:', lamaResult.status);
+      console.log('LaMa error:', lamaResult.error?.message || 'none');
       if (lamaResult.status !== 0 || !fs.existsSync(cleanVideoPath)) {
         console.log('LaMa failed, using original video');
         cleanVideoPath = videoPath;
