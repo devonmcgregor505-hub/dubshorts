@@ -396,7 +396,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
         const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
         console.log('Video URL:', videoUrl);
-
+        try { const t = await require('axios').default.head(videoUrl, {timeout:5000}); console.log('URL OK:', t.status); } catch(e) { console.log('URL FAIL:', e.message); }
         const videoData = await dubWithModelsLab(videoUrl, targetLang);
         fs.writeFileSync(dubbedVideoPath, videoData);
         console.log('ModelsLab dubbing complete! Video saved.');
