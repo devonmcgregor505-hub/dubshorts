@@ -378,10 +378,24 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
 
       // Dub
-      // DUBBING DISABLED - pass through original video
-      fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
-      console.log('Dubbing skipped - using original video');
-      // Dubbing disabled - using original video
+      if (provider === 'elevenlabs') {
+        const audioData = await dubWithElevenLabs(targetLang, cleanVideoPath, timestamp);
+        fs.writeFileSync(audioPath, audioData);
+        console.log('ElevenLabs dubbing complete!');
+      } else if (provider === 'modelslab') {
+        console.log('Uploading to temp storage...');
+        const uploadForm = new FormData();
+        uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
+        const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
+        const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+        console.log('Video URL:', videoUrl);
+        const videoData = await dubWithModelsLab(videoUrl, targetLang);
+        fs.writeFileSync(dubbedVideoPath, videoData);
+        console.log('ModelsLab dubbing complete!');
+      } else {
+        fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
+        console.log('No dubbing - using original video');
+      }
 
       // For transcription/captions: extract audio from dubbed content
       let cues = [];
