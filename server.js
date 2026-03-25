@@ -51,7 +51,7 @@ app.get('/clear-cache', (req, res) => {
 // ── QUEUE ─────────────────────────────────────────────────────────────────────
 const queue = [];
 let activeJobs = 0;
-const MAX_CONCURRENT = 2;
+const MAX_CONCURRENT = 8;
 
 function enqueue(job) {
   return new Promise((resolve, reject) => {
