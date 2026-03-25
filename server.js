@@ -461,6 +461,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           }
         } catch(e) {
           console.log('Caption generation failed:', e.message);
+          if (e.response) console.log('AAI error body:', JSON.stringify(e.response.data).slice(0,300));
         }
       }
 
