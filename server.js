@@ -428,10 +428,9 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           console.log('Audio uploaded to AssemblyAI');
           try { fs.unlinkSync(aaiAudioPath); } catch(e) {}
 
-          const aaiLang = (targetLang === 'none' || targetLang === 'en') ? 'en' : targetLang;
           const transcriptRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
             audio_url: uploadRes.data.upload_url,
-            language_code: aaiLang,
+            language_detection: true,
           }, {
             headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY },
             timeout: 30000
