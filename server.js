@@ -431,6 +431,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
           const transcriptRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
             audio_url: uploadRes.data.upload_url,
+            speech_model: 'universal-2',
           }, {
             headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY },
             timeout: 30000
