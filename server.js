@@ -417,7 +417,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       // VIDEO SOURCE for frame extraction and final merge
       // For elevenlabs: cleanVideoPath has the video (no audio)
       // For modelslab: dubbedVideoPath has video+audio
-      const videoSource = provider === 'modelslab' ? dubbedVideoPath : cleanVideoPath;
+      // Use dubbedVideoPath only if dubbing actually ran
+      const dubbingRan = targetLang !== 'none' && fs.existsSync(dubbedVideoPath) && fs.statSync(dubbedVideoPath).size > 1000;
+      const videoSource = dubbingRan ? dubbedVideoPath : cleanVideoPath;
+      console.log('videoSource:', dubbingRan ? 'dubbed' : 'clean', fs.existsSync(videoSource) ? fs.statSync(videoSource).size+'b' : 'MISSING');
       let videoForMerge = videoSource;
 
       // AssemblyAI transcription - fast word-level captions
