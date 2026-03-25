@@ -353,12 +353,21 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         console.log('No translation selected');
         fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
       } else {
-        console.log('Uploading to tmpfiles for ModelsLab...');
-        const uploadForm = new FormData();
-        uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
-        const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
-        const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
-        console.log('tmpfiles URL:', videoUrl);
+        const fileSize = fs.statSync(cleanVideoPath).size;
+        let videoUrl;
+        if (fileSize < 50 * 1024 * 1024) {
+          console.log('File under 50MB, uploading to tmpfiles...');
+          const uploadForm = new FormData();
+          uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
+          const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
+          videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+          console.log('tmpfiles URL:', videoUrl);
+        } else {
+          console.log('File over 50MB, uploading to R2...');
+          const r2Key = 'uploads/dub_input_' + timestamp + '.mp4';
+          videoUrl = await uploadToR2(cleanVideoPath, r2Key);
+          console.log('R2 URL:', videoUrl);
+        }
         const videoData = await dubWithModelsLab(videoUrl, targetLang);
         fs.writeFileSync(dubbedVideoPath, videoData);
         console.log('ModelsLab dubbing complete!');
