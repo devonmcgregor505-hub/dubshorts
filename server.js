@@ -108,34 +108,28 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
     return buildChunk(idx, vidW, fontSize, fontFamily, textStyle);
   }
 
-  function buildChunk(activeIdx, w, fs, ff, ts) {
-    let start = activeIdx;
-    while (start > 0) {
-      const prev = cues[start - 1];
-      const curr = cues[start];
-      if (curr.start - prev.end > 0.5) break;
-      start--;
-    }
-    const words = [];
-    const canvas = createCanvas(w, 100);
-    const ctx = canvas.getContext('2d');
-    ctx.font = `${ts} ${fs}px ${ff}`;
-    let lineW = 0;
-    let lines = 1;
-    for (let i = start; i < cues.length; i++) {
-      const word = cues[i];
-      const wordW = ctx.measureText(word.text + ' ').width;
-      if (lineW + wordW > w * 0.85) {
-        lines++;
-        lineW = wordW;
-        if (lines > 2) break;
-      } else {
-        lineW += wordW;
+  function buildChunk(activeIdx) {
+    // Find the line that contains the active word (15 char max per line)
+    // Build lines greedily from the start of the transcript
+    const lines = [];
+    let i = 0;
+    let activeLine = 0;
+    while (i < cues.length) {
+      const line = [];
+      let charCount = 0;
+      while (i < cues.length) {
+        const word = cues[i];
+        const wordLen = word.text.length;
+        if (line.length > 0 && charCount + 1 + wordLen > 15) break;
+        line.push({ text: word.text, highlight: i === activeIdx, start: word.start, end: word.end });
+        charCount += (line.length === 1 ? 0 : 1) + wordLen;
+        if (i === activeIdx) activeLine = lines.length;
+        i++;
       }
-      words.push({ text: word.text, highlight: i === activeIdx, start: word.start, end: word.end });
-      if (i > activeIdx && words.length > 0 && word.start > cues[activeIdx].end + 0.1) break;
+      lines.push(line);
     }
-    return { words };
+    // Return only the line containing the active word
+    return { words: lines[activeLine] || [] };
   }
 
   for (let i = 0; i < frames.length; i++) {
