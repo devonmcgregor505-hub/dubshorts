@@ -490,7 +490,6 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           console.log('Caption burning failed, skipping captions');
         }
       }
-      }
 
       // Final merge
       console.log('Final merge...');
