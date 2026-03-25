@@ -281,6 +281,7 @@ async function dubWithModelsLab(videoUrl, targetLang) {
     source_lang: 'en',
     output_lang: lang,
     speed: 1.0,
+    num_speakers: 0,
     file_prefix: 'dub_'+lang+'_'+Date.now()+'_'+Math.random().toString(36).slice(2),
     base64: false, webhook: null, track_id: null
   }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
@@ -476,14 +477,31 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       console.log('cues.length:', cues.length);
       if (cues.length > 0) {
         console.log('Burning captions with Python...');
+        // Scale to 720p for burning to save RAM, upscale after
+        const burnH = Math.min(vidH, 720);
+        const burnW = Math.round(vidW * burnH / vidH);
+        const scaledForBurn = path.resolve('uploads/scaled_'+timestamp+'.mp4');
+        const scaledStyle = Object.assign({}, captionStyle, { yPct: captionStyle.yPct || 70 });
+        runFFmpeg(['-y','-i',videoSource,'-vf',`scale=${burnW}:${burnH}`,'-c:v','libx264','-preset','ultrafast','-crf','23',scaledForBurn], 120000);
+        const burnSource = fs.existsSync(scaledForBurn) ? scaledForBurn : videoSource;
         const pyResult = spawnSync('python3', [
           path.join(__dirname, 'burn_captions.py'),
-          videoSource, captionedPath,
-          JSON.stringify(cues), JSON.stringify(captionStyle)
+          burnSource, captionedPath,
+          JSON.stringify(cues), JSON.stringify(scaledStyle)
         ], { encoding: 'utf8', timeout: 600000, maxBuffer: 100*1024*1024 });
+        try { fs.unlinkSync(scaledForBurn); } catch(e) {}
         console.log('Python stdout:', pyResult.stdout?.slice(-300));
         if (pyResult.stderr) console.log('Python stderr:', pyResult.stderr?.slice(-200));
         if (pyResult.status === 0 && fs.existsSync(captionedPath)) {
+          // Upscale back to original resolution
+          if (burnH < vidH) {
+            const upscaledPath = path.resolve('uploads/upscaled_'+timestamp+'.mp4');
+            runFFmpeg(['-y','-i',captionedPath,'-vf',`scale=${vidW}:${vidH}`,'-c:v','libx264','-preset','ultrafast','-crf','23',upscaledPath], 120000);
+            if (fs.existsSync(upscaledPath)) {
+              try { fs.unlinkSync(captionedPath); } catch(e) {}
+              fs.renameSync(upscaledPath, captionedPath);
+            }
+          }
           videoForMerge = captionedPath;
           console.log('Captions burned!');
         } else {

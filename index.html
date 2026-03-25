@@ -483,7 +483,13 @@ fileInput.addEventListener('change', () => {
   updateHint();
 });
 
-document.getElementById('langSelect').addEventListener('change', function(){ updateTranslateBtn(); savePreset(); });
+document.getElementById('langSelect').addEventListener('change', function(){
+  const lang = this.value;
+  const names = { none: 'Process Video', es: 'Spanish', hi: 'Hindi', pt: 'Portuguese', ja: 'Japanese', fr: 'French', pl: 'Polish' };
+  const btn = document.getElementById('translateBtn');
+  if (btn) btn.textContent = '→ ' + (names[lang] || lang);
+  savePreset();
+});
 document.getElementById('removeToggle').addEventListener('change', function(){ savePreset(); });
 document.getElementById('addToggle').addEventListener('change', function(){ savePreset(); });
 
