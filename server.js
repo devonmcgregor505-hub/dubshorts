@@ -8,6 +8,34 @@ const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
+const r2 = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+});
+
+async function uploadToR2(filePath, key) {
+  const fileBuffer = fs.readFileSync(filePath);
+  await r2.send(new PutObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME,
+    Key: key,
+    Body: fileBuffer,
+    ContentType: 'video/mp4',
+  }));
+  // Generate a signed URL valid for 1 hour
+  const url = await getSignedUrl(r2, new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME,
+    Key: key,
+  }), { expiresIn: 3600 });
+  console.log('Uploaded to R2:', key);
+  return url;
+}
 const ffmpegStatic = require('ffmpeg-static');
 const { createCanvas, loadImage, registerFont } = require('canvas');
 
@@ -201,12 +229,17 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
 
 
 // ── MODELSLAB ─────────────────────────────────────────────────────────────────
-async function dubWithModelsLab(videoUrl, targetLang, sourceLang='en') {
+async function dubWithModelsLab(localVideoPath, targetLang, timestamp, originalName, mimeType, sourceLang='en') {
   const langMap = {
     es: 'es', hi: 'hi', pt: 'pt-br', ja: 'ja', fr: 'fr', pl: 'pl',
     it: 'it', zh: 'zh', 'en-us': 'en-us', 'en-gb': 'en-gb', en: 'en-us'
   };
   const lang = langMap[targetLang] || targetLang;
+
+  // Upload to R2 and get signed URL
+  const r2Key = 'uploads/dub_input_' + timestamp + '.mp4';
+  const videoUrl = await uploadToR2(localVideoPath, r2Key);
+  console.log('R2 signed URL ready for ModelsLab');
 
   const dubRes = await axios.post('https://modelslab.com/api/v6/voice/create_dubbing', {
     key: process.env.MODELSLAB_API_KEY,
@@ -216,7 +249,7 @@ async function dubWithModelsLab(videoUrl, targetLang, sourceLang='en') {
     speed: 1.0,
     num_speakers: 0,
     voice_model: 'kokoro',
-    file_prefix: 'dub_'+lang+'_'+Date.now()+'_'+Math.random().toString(36).slice(2),
+    file_prefix: 'dub_'+lang+'_'+timestamp,
     base64: false, webhook: null, track_id: null
   }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
 
@@ -238,9 +271,12 @@ async function dubWithModelsLab(videoUrl, targetLang, sourceLang='en') {
         const dlRes = await axios.get(poll.data.output[0], { responseType: 'arraybuffer', timeout: 120000 });
         return dlRes.data;
       }
+      if (poll.data.status === 'failed') {
+        throw new Error('ModelsLab dubbing failed: ' + JSON.stringify(poll.data).slice(0, 200));
+      }
     }
   }
-  throw new Error('ModelsLab dubbing failed or timed out');
+  throw new Error('ModelsLab dubbing failed or timed out: ' + JSON.stringify(dubRes.data).slice(0, 200));
 }
 
 // ── MAIN ROUTE ────────────────────────────────────────────────────────────────
@@ -322,13 +358,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         console.log('No translation selected');
         fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
       } else {
-        console.log('Uploading to ModelsLab...');
-        const uploadForm = new FormData();
-        uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
-        const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
-        const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
-        console.log('Video URL:', videoUrl);
-        const videoData = await dubWithModelsLab(videoUrl, targetLang);
+        console.log('Uploading to R2 for ModelsLab...');
+        const videoData = await dubWithModelsLab(cleanVideoPath, targetLang, timestamp, req.file.originalname, req.file.mimetype);
         fs.writeFileSync(dubbedVideoPath, videoData);
         console.log('ModelsLab dubbing complete!');
       }
@@ -440,17 +471,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       if (targetLang === 'none') {
         console.log('No translation - merging with original audio...');
         runFFmpeg(['-y','-i',videoForMerge,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
-      } else if (provider === 'elevenlabs') {
-        // videoForMerge = captioned video (no audio) OR cleanVideoPath
-        // audioPath = dubbed audio mp3 from ElevenLabs
-        console.log('Merging video + ElevenLabs audio...');
-        runFFmpeg(['-y','-i',videoForMerge,'-i',audioPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k','-shortest',outputPath], 180000);
-      } else if (provider === 'modelslab') {
-        // videoForMerge has captions burned, dubbedVideoPath has Spanish audio
-        runFFmpeg(['-y','-i',videoForMerge,'-i',dubbedVideoPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
       } else {
-        // No dubbing - merge video with original audio
-        runFFmpeg(['-y','-i',videoForMerge,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
+        // Merge captioned video with ModelsLab dubbed audio
+        console.log('Merging video + ModelsLab dubbed audio...');
+        runFFmpeg(['-y','-i',videoForMerge,'-i',dubbedVideoPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
       }
       const outSize = fs.existsSync(outputPath) ? fs.statSync(outputPath).size : 0;
       console.log('Done! Output size:', outSize, 'bytes');
