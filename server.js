@@ -85,7 +85,7 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
   const yPct = (style.yPct !== undefined ? style.yPct : 75) / 100;
   const fontSizePct = (style.fontSize || 5) / 100;
   const fontSize = Math.max(10, Math.round(vidH * fontSizePct));
-  const fontFamily = fs.existsSync(fontPath) ? 'CaptionFont' : 'sans-serif';
+  const fontFamily = style.fontFamily || (fs.existsSync(fontPath) ? 'CaptionFont' : 'sans-serif');
   const textStyle = style.textStyle || 'bold';
   const textColor = style.textColor || '#ffffff';
   const outlineColor = style.outlineColor || '#000000';
