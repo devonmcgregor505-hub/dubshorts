@@ -416,6 +416,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       // AssemblyAI transcription - fast word-level captions
       if (req.body.addCaption === 'true' && process.env.ASSEMBLYAI_API_KEY) {
         try {
+          console.log('AAI key:', !!process.env.ASSEMBLYAI_API_KEY);
           console.log('Extracting audio for AssemblyAI...');
           const aaiAudioPath = path.resolve('uploads/aai_audio_'+timestamp+'.mp3');
           runFFmpeg(['-y','-i',videoSource,'-vn','-ac','1','-ar','16000','-c:a','mp3',aaiAudioPath], 60000);
