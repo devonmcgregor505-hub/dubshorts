@@ -192,7 +192,8 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
       });
     }
     fs.writeFileSync(framePath, canvas.toBuffer('image/jpeg', { quality: 0.92 }));
-    if (i % 30 === 0) console.log(`Captioned ${i}/${frames.length}`);
+    canvas.width = 0; canvas.height = 0;
+    if (i % 30 === 0) { console.log(`Captioned ${i}/${frames.length}`); await new Promise(r => setTimeout(r, 1)); }
   }
   console.log('All frames captioned!');
 }
