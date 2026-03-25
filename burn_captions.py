@@ -2,12 +2,42 @@ import sys
 import json
 import cv2
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import os
 
 def hex_to_rgb(h):
     h = h.lstrip("#")
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+def draw_text_with_outline(draw, x, y, txt, font, text_color, outline_color, outline_w, shadow, font_size, img):
+    # Shadow (blur-based to match canvas shadowBlur)
+    if shadow > 0:
+        blur_radius = max(1, int(shadow * font_size))
+        offset_y = max(1, int(shadow * font_size * 0.3))
+        shadow_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        shadow_draw = ImageDraw.Draw(shadow_layer)
+        shadow_draw.text((x, y), txt, font=font, fill=(0, 0, 0, 230), anchor="mm")
+        shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+        img.paste(Image.new("RGBA", img.size, (0,0,0,0)), mask=shadow_layer)
+        # Composite shadow onto image
+        base = img.copy()
+        shadow_shifted = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        shadow_shifted.paste(shadow_layer, (0, offset_y))
+        img_rgba = img.convert("RGBA")
+        img_rgba = Image.alpha_composite(img_rgba, shadow_shifted)
+        img.paste(img_rgba.convert("RGB"))
+        draw = ImageDraw.Draw(img)
+
+    # Outline - use thick text trick for round outline like strokeText
+    if outline_w > 0:
+        for dx in range(-outline_w, outline_w + 1):
+            for dy in range(-outline_w, outline_w + 1):
+                if dx*dx + dy*dy <= outline_w*outline_w:
+                    draw.text((x + dx, y + dy), txt, font=font, fill=outline_color, anchor="mm")
+
+    # Main text
+    draw.text((x, y), txt, font=font, fill=text_color, anchor="mm")
+    return draw
 
 def burn_captions(video_path, output_path, cues, style):
     cap = cv2.VideoCapture(video_path)
@@ -18,16 +48,21 @@ def burn_captions(video_path, output_path, cues, style):
 
     y_pct = style.get("yPct", 70) / 100
     font_size_pct = style.get("fontSize", 5) / 100
-    font_size = max(10, int(height * font_size_pct))
+    # Match preview: Math.round(H * fsp), min 8
+    font_size = max(8, round(height * font_size_pct))
     text_color = hex_to_rgb(style.get("textColor", "#ffffff"))
     outline_color = hex_to_rgb(style.get("outlineColor", "#000000"))
-    highlight_color = hex_to_rgb(style.get("highlightColor", "#fbff00"))
-    outline_w = max(1, int(font_size * style.get("outlineWidth", 15) / 100))
+    highlight_color = hex_to_rgb(style.get("highlightColor", "#f5e132"))
+    # Match preview: outlineWidth is % of fontSize
+    outline_w = max(0, round(font_size * style.get("outlineWidth", 15) / 100))
     text_case = style.get("textCase", "upper")
     caption_mode = style.get("captionMode", "single")
-    y_pos = int(height * y_pct)
+    shadow = style.get("shadowSize", 0)
+    text_style = style.get("textStyle", "bold")
+    # y is center of text, matching textBaseline='middle'
+    y_pos = round(height * y_pct)
 
-    # Load font
+    # Load font - match textStyle (bold/italic/bold italic/normal)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     font_paths = [
         os.path.join(script_dir, "DejaVuSans-Bold.ttf"),
@@ -46,7 +81,7 @@ def burn_captions(video_path, output_path, cues, style):
     if font is None:
         font = ImageFont.load_default()
 
-    # Pre-build lines (15 char max)
+    # Pre-build lines (15 char max per line, matching server buildChunk)
     lines = []
     i = 0
     while i < len(cues):
@@ -95,39 +130,34 @@ def burn_captions(video_path, output_path, cues, style):
             active = get_active_word(line, t)
             img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             draw = ImageDraw.Draw(img)
+            cx = width // 2
 
             if caption_mode == "single":
                 word = active if active else line[0]
                 txt = apply_case(word["text"])
-                bbox = draw.textbbox((0, 0), txt, font=font)
-                tw = bbox[2] - bbox[0]
-                x = (width - tw) // 2
-                y = y_pos - font_size // 2
-                for dx, dy in [(-outline_w,0),(outline_w,0),(0,-outline_w),(0,outline_w),
-                                (-outline_w,-outline_w),(outline_w,-outline_w),(-outline_w,outline_w),(outline_w,outline_w)]:
-                    draw.text((x+dx, y+dy), txt, font=font, fill=outline_color)
-                draw.text((x, y), txt, font=font, fill=text_color)
+                draw_text_with_outline(draw, cx, y_pos, txt, font,
+                    text_color, outline_color, outline_w, shadow, font_size, img)
+
             else:
-                # Multi-word or highlight - draw all words in line
+                # Multi-word: measure total width then draw word by word
+                # matching preview: curX = W/2 - totalWidth/2
                 words_txt = [apply_case(w["text"]) for w in line]
-                full = " ".join(words_txt)
-                bbox = draw.textbbox((0, 0), full, font=font)
-                tw = bbox[2] - bbox[0]
-                x = (width - tw) // 2
-                y = y_pos - font_size // 2
-                # Draw each word individually for highlight
-                cx = x
-                for wi, w in enumerate(line):
-                    txt = apply_case(w["text"])
-                    space = " " if wi < len(line)-1 else ""
+                spaces = [" " if i < len(line)-1 else "" for i in range(len(line))]
+                widths = []
+                for wt, sp in zip(words_txt, spaces):
+                    bb = font.getbbox(wt + sp)
+                    widths.append(bb[2] - bb[0])
+                total_w = sum(widths)
+                cur_x = cx - total_w // 2
+
+                for wi, (w, wt, sp, ww) in enumerate(zip(line, words_txt, spaces, widths)):
                     is_active = (active and w["start"] == active["start"])
                     color = highlight_color if (caption_mode == "highlight" and is_active) else text_color
-                    for dx, dy in [(-outline_w,0),(outline_w,0),(0,-outline_w),(0,outline_w),
-                                    (-outline_w,-outline_w),(outline_w,-outline_w),(-outline_w,outline_w),(outline_w,outline_w)]:
-                        draw.text((cx+dx, y+dy), txt+space, font=font, fill=outline_color)
-                    draw.text((cx, y), txt+space, font=font, fill=color)
-                    wb = draw.textbbox((0,0), txt+space, font=font)
-                    cx += wb[2] - wb[0]
+                    # Center of this word
+                    word_cx = cur_x + ww // 2
+                    draw_text_with_outline(draw, word_cx, y_pos, wt + sp, font,
+                        color, outline_color, outline_w, shadow, font_size, img)
+                    cur_x += ww
 
             frame = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
@@ -138,6 +168,7 @@ def burn_captions(video_path, output_path, cues, style):
 
     cap.release()
     out.release()
+
     # Re-encode with ffmpeg to fix mp4v codec
     import subprocess
     subprocess.run([
