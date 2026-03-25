@@ -198,77 +198,7 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
   console.log('All frames captioned!');
 }
 
-// ── GROQ STT ──────────────────────────────────────────────────────────────────
-async function transcribeWithGroq(audioPath) {
-  const FormDataNode = require('form-data');
-  const form = new FormDataNode();
-  form.append('file', fs.createReadStream(audioPath), { filename: 'audio.mp3', contentType: 'audio/mp3' });
-  form.append('model', 'whisper-large-v3');
-  form.append('response_format', 'verbose_json');
-  form.append('timestamp_granularities[]', 'word');
-  form.append('language', 'es');
-  const res = await axios.post('https://api.groq.com/openai/v1/audio/transcriptions', form, {
-    headers: { ...form.getHeaders(), 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
-    timeout: 60000
-  });
-  return res.data;
-}
 
-// ── ELEVENLABS ────────────────────────────────────────────────────────────────
-// ElevenLabs flow:
-// 1. Re-encode video to h264 so ElevenLabs accepts it
-// 2. Upload file directly to ElevenLabs dubbing API
-// 3. Poll until status === 'dubbed'
-// 4. Download audio from /audio/{lang} endpoint (returns audio-only mp3)
-// 5. Save as audioPath
-// Then in main: merge cleanVideoPath (video) + audioPath (dubbed audio) = output
-async function dubWithElevenLabs(targetLang, localVideoPath, timestamp) {
-  const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
-  const lang = langMap[targetLang] || 'es';
-
-  // Re-encode to h264/aac so ElevenLabs can process it
-  const encodedPath = path.resolve('uploads/eleven_encoded_'+timestamp+'.mp4');
-  runFFmpeg(['-y','-i',localVideoPath,'-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=44100','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k','-shortest',encodedPath], 60000);
-  console.log('Re-encoded video for ElevenLabs');
-
-  const elevenForm = new FormData();
-  elevenForm.append('file', fs.createReadStream(encodedPath), { filename: 'video.mp4', contentType: 'video/mp4' });
-  elevenForm.append('target_lang', lang);
-  elevenForm.append('source_lang', 'en');
-  elevenForm.append('mode', 'automatic');
-  elevenForm.append('num_speakers', '0');
-  elevenForm.append('watermark', 'false');
-
-  const startRes = await axios.post('https://api.elevenlabs.io/v1/dubbing', elevenForm, {
-    headers: { ...elevenForm.getHeaders(), 'xi-api-key': process.env.ELEVENLABS_API_KEY },
-    timeout: 120000, maxContentLength: Infinity, maxBodyLength: Infinity
-  });
-
-  try { fs.unlinkSync(encodedPath); } catch(e) {}
-
-  const dubbingId = startRes.data.dubbing_id;
-  console.log('ElevenLabs dubbing ID:', dubbingId);
-
-  // Poll for completion
-  for (let i = 0; i < 60; i++) {
-    await new Promise(r => setTimeout(r, 5000));
-    const status = await axios.get(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}`, {
-      headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }
-    });
-    console.log(`ElevenLabs poll ${i+1}: ${status.data.status}`);
-    if (status.data.status === 'dubbed') {
-      // Download dubbed AUDIO (this endpoint returns audio only - mp3)
-      const dlRes = await axios.get(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}/audio/${lang}`, {
-        headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY },
-        responseType: 'arraybuffer', timeout: 120000
-      });
-      console.log('ElevenLabs audio downloaded, size:', dlRes.data.byteLength);
-      return dlRes.data; // This is audio-only mp3 data
-    }
-    if (status.data.status === 'failed') throw new Error('ElevenLabs dubbing failed');
-  }
-  throw new Error('ElevenLabs dubbing timed out');
-}
 
 // ── MODELSLAB ─────────────────────────────────────────────────────────────────
 async function dubWithModelsLab(videoUrl, targetLang, sourceLang='en') {
@@ -389,14 +319,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
       // Dub
       if (targetLang === 'none') {
-        console.log('No translation - merging with original audio...');
-        runFFmpeg(['-y','-i',videoForMerge,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
-      } else if (provider === 'elevenlabs') {
-        const audioData = await dubWithElevenLabs(targetLang, cleanVideoPath, timestamp);
-        fs.writeFileSync(audioPath, audioData);
-        console.log('ElevenLabs dubbing complete!');
-      } else if (provider === 'modelslab') {
-        console.log('Uploading to temp storage...');
+        console.log('No translation selected');
+        fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
+      } else {
+        console.log('Uploading to ModelsLab...');
         const uploadForm = new FormData();
         uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
         const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
@@ -405,10 +331,6 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         const videoData = await dubWithModelsLab(videoUrl, targetLang);
         fs.writeFileSync(dubbedVideoPath, videoData);
         console.log('ModelsLab dubbing complete!');
-      } else {
-        // No translation selected
-        fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
-        console.log('No dubbing - using original video');
       }
 
       // For transcription/captions: extract audio from dubbed content
