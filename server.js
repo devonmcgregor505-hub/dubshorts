@@ -457,9 +457,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
             });
             console.log('AssemblyAI poll', i+1, ':', pollRes.data.status);
             if (pollRes.data.status === 'completed') {
-              cues = (pollRes.data.words || []).map(w => ({
+              const rawWords = pollRes.data.words || [];
+              cues = rawWords.map((w, i) => ({
                 start: w.start / 1000,
-                end: w.end / 1000,
+                end: rawWords[i+1] ? rawWords[i+1].start / 1000 : w.end / 1000 + 0.5,
                 text: w.text
               }));
               console.log('AssemblyAI done,', cues.length, 'word cues');
