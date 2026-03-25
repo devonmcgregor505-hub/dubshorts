@@ -420,7 +420,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       let videoForMerge = videoSource;
 
       // AssemblyAI transcription - fast word-level captions
-      if (req.body.addCaption === 'true' && process.env.ASSEMBLYAI_API_KEY) {
+      if (req.body.addCaption === 'true') {
         try {
           console.log('AAI key:', !!process.env.ASSEMBLYAI_API_KEY);
           console.log('Extracting audio for AssemblyAI...');
@@ -481,7 +481,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         const burnH = Math.min(vidH, 720);
         const burnW = Math.round(vidW * burnH / vidH) & ~1;
         const scaledForBurn = path.resolve('uploads/scaled_'+timestamp+'.mp4');
-        const scaledStyle = Object.assign({}, captionStyle, { yPct: captionStyle.yPct || 70 });
+        const scaledStyle = Object.assign({}, captionStyle, { yPct: captionStyle.yPct !== undefined ? captionStyle.yPct : 70 });
         runFFmpeg(['-y','-i',videoSource,'-vf',`scale=${burnW}:${burnH}`,'-c:v','libx264','-preset','ultrafast','-crf','23',scaledForBurn], 120000);
         const burnSource = fs.existsSync(scaledForBurn) ? scaledForBurn : videoSource;
         const pyResult = spawnSync('python3', [

@@ -28,7 +28,9 @@ def burn_captions(video_path, output_path, cues, style):
     y_pos = int(height * y_pct)
 
     # Load font
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     font_paths = [
+        os.path.join(script_dir, "DejaVuSans-Bold.ttf"),
         "/app/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
@@ -78,8 +80,9 @@ def burn_captions(video_path, output_path, cues, style):
         if text_case == "lower": return txt.lower()
         return txt
 
+    tmp_output = output_path + ".tmp.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    out = cv2.VideoWriter(tmp_output, fourcc, fps, (width, height))
 
     frame_idx = 0
     while True:
@@ -135,6 +138,14 @@ def burn_captions(video_path, output_path, cues, style):
 
     cap.release()
     out.release()
+    # Re-encode with ffmpeg to fix mp4v codec
+    import subprocess
+    subprocess.run([
+        'ffmpeg', '-y', '-i', tmp_output,
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+        '-pix_fmt', 'yuv420p', output_path
+    ], check=True, capture_output=True)
+    os.remove(tmp_output)
     print(f"Done! {frame_idx} frames", flush=True)
 
 if __name__ == "__main__":
