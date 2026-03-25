@@ -473,6 +473,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       }
 
       // Burn captions if needed
+      console.log('captionStyle:', JSON.stringify(captionStyle));
+      console.log('cues.length:', cues.length);
       if (cues.length > 0) {
         console.log('Extracting frames...');
         fs.mkdirSync(framesDir, { recursive: true });
