@@ -479,7 +479,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         console.log('Burning captions with Python...');
         // Scale to 720p for burning to save RAM, upscale after
         const burnH = Math.min(vidH, 720);
-        const burnW = Math.round(vidW * burnH / vidH);
+        const burnW = Math.round(vidW * burnH / vidH) & ~1;
         const scaledForBurn = path.resolve('uploads/scaled_'+timestamp+'.mp4');
         const scaledStyle = Object.assign({}, captionStyle, { yPct: captionStyle.yPct || 70 });
         runFFmpeg(['-y','-i',videoSource,'-vf',`scale=${burnW}:${burnH}`,'-c:v','libx264','-preset','ultrafast','-crf','23',scaledForBurn], 120000);
