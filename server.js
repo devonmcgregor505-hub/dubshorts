@@ -242,7 +242,7 @@ async function dubWithModelsLab(videoUrl, targetLang, sourceLang='en') {
     source_lang: sourceLang,
     output_lang: lang,
     speed: 1.0,
-    num_speakers: 0,
+    num_speakers: 2,
     voice_model: 'kokoro',
     file_prefix: 'dub_'+lang+'_'+Date.now()+'_'+Math.random().toString(36).slice(2),
     base64: false, webhook: null, track_id: null
