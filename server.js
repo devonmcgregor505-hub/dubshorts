@@ -389,8 +389,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
       // Dub
       if (targetLang === 'none') {
-        fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
-        console.log('No translation selected');
+        console.log('No translation - merging with original audio...');
+        runFFmpeg(['-y','-i',videoForMerge,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
       } else if (provider === 'elevenlabs') {
         const audioData = await dubWithElevenLabs(targetLang, cleanVideoPath, timestamp);
         fs.writeFileSync(audioPath, audioData);
@@ -495,8 +495,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       // Final merge
       console.log('Final merge...');
       if (targetLang === 'none') {
-        fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
-        console.log('No translation selected');
+        console.log('No translation - merging with original audio...');
+        runFFmpeg(['-y','-i',videoForMerge,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
       } else if (provider === 'elevenlabs') {
         // videoForMerge = captioned video (no audio) OR cleanVideoPath
         // audioPath = dubbed audio mp3 from ElevenLabs
