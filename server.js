@@ -413,26 +413,54 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       const videoSource = provider === 'modelslab' ? dubbedVideoPath : cleanVideoPath;
       let videoForMerge = videoSource;
 
-      // Whisper transcription - runs after dub so audio is ready
-      if (req.body.addCaption === 'true') {
+      // AssemblyAI transcription - fast word-level captions
+      if (req.body.addCaption === 'true' && process.env.ASSEMBLYAI_API_KEY) {
         try {
-          console.log('Extracting audio for Whisper from:', videoSource);
-          const whisperAudioPath = path.resolve('uploads/whisper_audio_'+timestamp+'.mp3');
-          runFFmpeg(['-y','-i',videoSource,'-vn','-ac','1','-ar','16000','-c:a','mp3',whisperAudioPath], 60000);
-          const whisperResult = spawnSync('python3', [
-            path.join(__dirname, 'transcribe.py'),
-            whisperAudioPath,
-            targetLang === 'none' ? 'en' : targetLang
-          ], { encoding: 'utf8', timeout: 300000, maxBuffer: 10*1024*1024 });
-          if (whisperResult.status === 0 && whisperResult.stdout) {
-            cues = JSON.parse(whisperResult.stdout.trim());
-            console.log('Whisper transcription done,', cues.length, 'cues');
-          } else {
-            console.log('Whisper failed:', whisperResult.stderr?.slice(-200));
+          console.log('Extracting audio for AssemblyAI...');
+          const aaiAudioPath = path.resolve('uploads/aai_audio_'+timestamp+'.mp3');
+          runFFmpeg(['-y','-i',videoSource,'-vn','-ac','1','-ar','16000','-c:a','mp3',aaiAudioPath], 60000);
+
+          const audioBuffer = fs.readFileSync(aaiAudioPath);
+          const uploadRes = await axios.post('https://api.assemblyai.com/v2/upload', audioBuffer, {
+            headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY, 'content-type': 'application/octet-stream' },
+            timeout: 60000
+          });
+          console.log('Audio uploaded to AssemblyAI');
+          try { fs.unlinkSync(aaiAudioPath); } catch(e) {}
+
+          const aaiLang = (targetLang === 'none' || targetLang === 'en') ? 'en' : targetLang;
+          const transcriptRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
+            audio_url: uploadRes.data.upload_url,
+            language_code: aaiLang,
+          }, {
+            headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY },
+            timeout: 30000
+          });
+
+          const transcriptId = transcriptRes.data.id;
+          console.log('AssemblyAI job:', transcriptId);
+
+          for (let i = 0; i < 30; i++) {
+            await new Promise(r => setTimeout(r, 2000));
+            const pollRes = await axios.get('https://api.assemblyai.com/v2/transcript/'+transcriptId, {
+              headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 15000
+            });
+            console.log('AssemblyAI poll', i+1, ':', pollRes.data.status);
+            if (pollRes.data.status === 'completed') {
+              cues = (pollRes.data.words || []).map(w => ({
+                start: w.start / 1000,
+                end: w.end / 1000,
+                text: w.text
+              }));
+              console.log('AssemblyAI done,', cues.length, 'word cues');
+              break;
+            } else if (pollRes.data.status === 'error') {
+              console.log('AssemblyAI error:', pollRes.data.error);
+              break;
+            }
           }
-          try { fs.unlinkSync(whisperAudioPath); } catch(e) {}
         } catch(e) {
-          console.log('Caption generation failed, skipping:', e.message);
+          console.log('Caption generation failed:', e.message);
         }
       }
 
