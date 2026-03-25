@@ -475,22 +475,21 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       console.log('captionStyle:', JSON.stringify(captionStyle));
       console.log('cues.length:', cues.length);
       if (cues.length > 0) {
-        console.log('Extracting frames...');
-        fs.mkdirSync(framesDir, { recursive: true });
-        // Scale caption FPS based on duration to avoid OOM
-        const probeDur = spawnSync(FFMPEG_PATH, ['-i', videoSource], { encoding: 'utf8' });
-        const durM = (probeDur.stderr||'').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
-        const vidDur = durM ? parseInt(durM[1])*3600+parseInt(durM[2])*60+parseFloat(durM[3]) : 30;
-        const captionFps = vidDur > 60 ? 10 : vidDur > 30 ? 15 : Math.min(fps, 24);
-        console.log('Caption FPS:', captionFps, 'for', vidDur.toFixed(1)+'s video');
-        runFFmpeg(['-y','-i',videoSource,'-vf',`fps=${captionFps}`,'-q:v','3','-threads','2',path.join(framesDir,'frame%06d.jpg')], 300000);
-        console.log('Burning captions...');
-        await burnCaptionsOnFrames(framesDir, cues, vidW, vidH, captionFps, captionStyle);
-        console.log('Reassembling...');
-        runFFmpeg(['-y','-framerate',String(captionFps),'-i',path.join(framesDir,'frame%06d.jpg'),'-c:v','libx264','-preset','ultrafast','-crf','28','-pix_fmt','yuv420p','-threads','2',captionedPath], 300000);
-        try { fs.readdirSync(framesDir).forEach(f=>fs.unlinkSync(path.join(framesDir,f))); fs.rmdirSync(framesDir); } catch(e){}
-        videoForMerge = captionedPath;
-        console.log('Captions burned!');
+        console.log('Burning captions with Python...');
+        const pyResult = spawnSync('python3', [
+          path.join(__dirname, 'burn_captions.py'),
+          videoSource, captionedPath,
+          JSON.stringify(cues), JSON.stringify(captionStyle)
+        ], { encoding: 'utf8', timeout: 600000, maxBuffer: 100*1024*1024 });
+        console.log('Python stdout:', pyResult.stdout?.slice(-300));
+        if (pyResult.stderr) console.log('Python stderr:', pyResult.stderr?.slice(-200));
+        if (pyResult.status === 0 && fs.existsSync(captionedPath)) {
+          videoForMerge = captionedPath;
+          console.log('Captions burned!');
+        } else {
+          console.log('Caption burning failed, skipping captions');
+        }
+      }
       }
 
       // Final merge
