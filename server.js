@@ -474,46 +474,6 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       console.log('captionStyle:', JSON.stringify(captionStyle));
       console.log('cues.length:', cues.length);
       if (cues.length > 0) {
-        if (vidDur > 45) {
-          // Long video: use FFmpeg drawtext - no canvas, no RAM issues
-          console.log('Using FFmpeg drawtext for long video...');
-          const fontFile = fs.existsSync(fontPath) ? fontPath : '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
-          const fontSize2 = Math.max(10, Math.round(vidH * (captionStyle.fontSize || 5) / 100));
-          const yPos = Math.round(vidH * (captionStyle.yPct || 70) / 100);
-          const textColor2 = (captionStyle.textColor || '#ffffff').replace('#','');
-          const outlineColor2 = (captionStyle.outlineColor || '#000000').replace('#','');
-          const outlineW = Math.round(fontSize2 * (captionStyle.outlineWidth || 15) / 100);
-
-          // Build lines using same 15-char rule
-          const dtLines = [];
-          let ci = 0;
-          while (ci < cues.length) {
-            const line = [];
-            let chars = 0;
-            while (ci < cues.length) {
-              const w = cues[ci];
-              const wl = w.text.length;
-              if (line.length > 0 && chars + 1 + wl > 15) break;
-              line.push(w);
-              chars += (line.length === 1 ? 0 : 1) + wl;
-              ci++;
-            }
-            dtLines.push(line);
-          }
-
-          // Build drawtext filter - one per line, show during line's time range
-          const filters = dtLines.map(line => {
-            const lineStart = line[0].start;
-            const lineEnd = line[line.length-1].end;
-            const txt = line.map(w => (captionStyle.textCase === 'upper' ? w.text.toUpperCase() : w.text)).join(' ')
-              .replace(/'/g, '').replace(/:/g, '\:').replace(/\/g, '/');
-            return `drawtext=fontfile='${fontFile}':text='${txt}':fontsize=${fontSize2}:fontcolor=0x${textColor2}:borderw=${outlineW}:bordercolor=0x${outlineColor2}:x=(w-text_w)/2:y=${yPos}:enable='between(t,${lineStart.toFixed(3)},${lineEnd.toFixed(3)})'`;
-          }).join(',');
-
-          runFFmpeg(['-y','-i',videoSource,'-vf',filters,'-c:v','libx264','-preset','ultrafast','-crf','28','-threads','2',captionedPath], 600000);
-          videoForMerge = captionedPath;
-          console.log('Drawtext captions burned!');
-        } else {
         console.log('Extracting frames...');
         fs.mkdirSync(framesDir, { recursive: true });
         // Scale caption FPS based on duration to avoid OOM
@@ -530,7 +490,6 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         try { fs.readdirSync(framesDir).forEach(f=>fs.unlinkSync(path.join(framesDir,f))); fs.rmdirSync(framesDir); } catch(e){}
         videoForMerge = captionedPath;
         console.log('Captions burned!');
-        } // end canvas captions
       }
 
       // Final merge
