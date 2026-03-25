@@ -216,8 +216,6 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
 
       <!-- Toggles -->
-      <input type="checkbox" id="removeToggle" style="display:none" onchange="onRemove();autoSave();">
-      <input type="checkbox" id="addToggle" style="display:none" onchange="onAdd();autoSave();">
       <div class="tog-row">
         <div class="tc" id="removeCard" onclick="document.getElementById('removeToggle').click();" style="cursor:pointer;">
           <div class="tc-ic">🗑</div>
@@ -225,6 +223,11 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
             <div class="tc-title">Remove Captions</div>
             <div class="tc-desc">Draw box over captions</div>
           </div>
+          <label class="tog" onclick="event.stopPropagation()">
+            <input type="checkbox" id="removeToggle" onchange="onRemove();savePreset();">
+            <div class="tog-track"></div>
+            <div class="tog-thumb"></div>
+          </label>
         </div>
         <div class="tc" id="addCard" onclick="document.getElementById('addToggle').click();" style="cursor:pointer;">
           <div class="tc-ic">💬</div>
@@ -232,6 +235,11 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
             <div class="tc-title">Add Captions</div>
             <div class="tc-desc">Translated subtitles</div>
           </div>
+          <label class="tog" onclick="event.stopPropagation()">
+            <input type="checkbox" id="addToggle" onchange="onAdd();savePreset();">
+            <div class="tog-track"></div>
+            <div class="tog-thumb"></div>
+          </label>
         </div>
       </div>
 
