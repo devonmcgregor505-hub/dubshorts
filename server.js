@@ -271,17 +271,21 @@ async function dubWithElevenLabs(targetLang, localVideoPath, timestamp) {
 }
 
 // ── MODELSLAB ─────────────────────────────────────────────────────────────────
-async function dubWithModelsLab(videoUrl, targetLang) {
-  const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
-  const lang = langMap[targetLang] || 'es';
+async function dubWithModelsLab(videoUrl, targetLang, sourceLang='en') {
+  const langMap = {
+    es: 'es', hi: 'hi', pt: 'pt-br', ja: 'ja', fr: 'fr', pl: 'pl',
+    it: 'it', zh: 'zh', 'en-us': 'en-us', 'en-gb': 'en-gb', en: 'en-us'
+  };
+  const lang = langMap[targetLang] || targetLang;
 
   const dubRes = await axios.post('https://modelslab.com/api/v6/voice/create_dubbing', {
     key: process.env.MODELSLAB_API_KEY,
     init_video: videoUrl,
-    source_lang: 'en',
+    source_lang: sourceLang,
     output_lang: lang,
     speed: 1.0,
     num_speakers: 0,
+    voice_model: 'kokoro',
     file_prefix: 'dub_'+lang+'_'+Date.now()+'_'+Math.random().toString(36).slice(2),
     base64: false, webhook: null, track_id: null
   }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
