@@ -364,7 +364,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           console.log('tmpfiles URL:', videoUrl);
         } else {
           console.log('File over 50MB, uploading to R2...');
-          const r2Key = 'uploads/dub_input_' + timestamp + '.mp4';
+          const r2Key = 'uploads/dub_input_' + Date.now() + '.mp4';
           videoUrl = await uploadToR2(cleanVideoPath, r2Key);
           console.log('R2 URL:', videoUrl);
         }
