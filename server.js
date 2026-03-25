@@ -476,7 +476,12 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       if (cues.length > 0) {
         console.log('Extracting frames...');
         fs.mkdirSync(framesDir, { recursive: true });
-        const captionFps = Math.min(fps, 24);
+        // Scale caption FPS based on duration to avoid OOM
+        const probeDur = spawnSync(FFMPEG_PATH, ['-i', videoSource], { encoding: 'utf8' });
+        const durM = (probeDur.stderr||'').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
+        const vidDur = durM ? parseInt(durM[1])*3600+parseInt(durM[2])*60+parseFloat(durM[3]) : 30;
+        const captionFps = vidDur > 60 ? 10 : vidDur > 30 ? 15 : Math.min(fps, 24);
+        console.log('Caption FPS:', captionFps, 'for', vidDur.toFixed(1)+'s video');
         runFFmpeg(['-y','-i',videoSource,'-vf',`fps=${captionFps}`,'-q:v','3','-threads','2',path.join(framesDir,'frame%06d.jpg')], 300000);
         console.log('Burning captions...');
         await burnCaptionsOnFrames(framesDir, cues, vidW, vidH, captionFps, captionStyle);
