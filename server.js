@@ -416,7 +416,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       // Whisper transcription - runs after dub so audio is ready
       if (req.body.addCaption === 'true') {
         try {
-          console.log('Extracting audio for Whisper...');
+          console.log('Extracting audio for Whisper from:', videoSource);
           const whisperAudioPath = path.resolve('uploads/whisper_audio_'+timestamp+'.mp3');
           runFFmpeg(['-y','-i',videoSource,'-vn','-ac','1','-ar','16000','-c:a','mp3',whisperAudioPath], 60000);
           const whisperResult = spawnSync('python3', [
