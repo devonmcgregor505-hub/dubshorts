@@ -509,7 +509,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         // No dubbing - merge video with original audio
         runFFmpeg(['-y','-i',videoForMerge,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
       }
-      console.log('Done!');
+      const outSize = fs.existsSync(outputPath) ? fs.statSync(outputPath).size : 0;
+      console.log('Done! Output size:', outSize, 'bytes');
 
       setCachedResult(cacheKey, outputPath);
       allFiles.forEach(f=>{ try { if(fs.existsSync(f)) fs.unlinkSync(f); } catch(e){} });
