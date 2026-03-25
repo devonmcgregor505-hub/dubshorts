@@ -40,6 +40,13 @@ if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
 if (!fs.existsSync('cache')) fs.mkdirSync('cache');
 
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
+app.get('/clear-cache', (req, res) => {
+  try {
+    const files = fs.readdirSync('cache');
+    files.forEach(f => fs.unlinkSync(path.join('cache', f)));
+    res.send('Cache cleared: ' + files.length + ' files deleted');
+  } catch(e) { res.send('Cache clear error: ' + e.message); }
+});
 
 // ── QUEUE ─────────────────────────────────────────────────────────────────────
 const queue = [];
