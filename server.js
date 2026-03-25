@@ -229,17 +229,12 @@ async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
 
 
 // ── MODELSLAB ─────────────────────────────────────────────────────────────────
-async function dubWithModelsLab(localVideoPath, targetLang, timestamp, originalName, mimeType, sourceLang='en') {
+async function dubWithModelsLab(videoUrl, targetLang, sourceLang='en') {
   const langMap = {
     es: 'es', hi: 'hi', pt: 'pt-br', ja: 'ja', fr: 'fr', pl: 'pl',
     it: 'it', zh: 'zh', 'en-us': 'en-us', 'en-gb': 'en-gb', en: 'en-us'
   };
   const lang = langMap[targetLang] || targetLang;
-
-  // Upload to R2 and get signed URL
-  const r2Key = 'uploads/dub_input_' + timestamp + '.mp4';
-  const videoUrl = await uploadToR2(localVideoPath, r2Key);
-  console.log('R2 signed URL ready for ModelsLab');
 
   const dubRes = await axios.post('https://modelslab.com/api/v6/voice/create_dubbing', {
     key: process.env.MODELSLAB_API_KEY,
@@ -248,7 +243,7 @@ async function dubWithModelsLab(localVideoPath, targetLang, timestamp, originalN
     output_lang: lang,
     speed: 1.0,
     num_speakers: 0,
-    voice_model: 'xtts_v2',
+    voice_model: 'kokoro',
     file_prefix: 'dub_'+lang+'_'+timestamp,
     base64: false, webhook: null, track_id: null
   }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
@@ -358,8 +353,13 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         console.log('No translation selected');
         fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
       } else {
-        console.log('Uploading to R2 for ModelsLab...');
-        const videoData = await dubWithModelsLab(cleanVideoPath, targetLang, timestamp, req.file.originalname, req.file.mimetype);
+        console.log('Uploading to tmpfiles for ModelsLab...');
+        const uploadForm = new FormData();
+        uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
+        const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
+        const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+        console.log('tmpfiles URL:', videoUrl);
+        const videoData = await dubWithModelsLab(videoUrl, targetLang);
         fs.writeFileSync(dubbedVideoPath, videoData);
         console.log('ModelsLab dubbing complete!');
       }
