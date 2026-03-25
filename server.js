@@ -248,7 +248,7 @@ async function dubWithModelsLab(localVideoPath, targetLang, timestamp, originalN
     output_lang: lang,
     speed: 1.0,
     num_speakers: 0,
-    voice_model: 'kokoro',
+    voice_model: 'xtts_v2',
     file_prefix: 'dub_'+lang+'_'+timestamp,
     base64: false, webhook: null, track_id: null
   }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
