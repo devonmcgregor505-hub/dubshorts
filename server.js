@@ -456,7 +456,10 @@ app.post('/translate', upload.single('video'), async (req, res) => {
               console.log(`Segment ${i+1} dubbed!`);
             } catch(e) {
               console.log(`Segment ${i+1} dub failed:`, e.message, '- using original');
-              dubbedSegments.push({ path: segPath, start: seg.start, end: seg.end, original: true });
+              // Copy segPath to a safe location before it gets deleted
+              const segFallbackPath = path.resolve('uploads/seg_fallback_'+timestamp+'_'+i+'.mp4');
+              try { fs.copyFileSync(segPath, segFallbackPath); } catch(ce) {}
+              dubbedSegments.push({ path: segFallbackPath, start: seg.start, end: seg.end, original: true });
             }
             try { fs.unlinkSync(segPath); } catch(e) {}
           }
