@@ -421,10 +421,13 @@ app.post('/translate', upload.single('video'), async (req, res) => {
               timeout: 60000
             });
             try { fs.unlinkSync(diarAudioPath); } catch(e) {}
+            console.log('Submitting diarization job...');
             const diarJob = await axios.post('https://api.assemblyai.com/v2/transcript', {
               audio_url: diarUpload.data.upload_url,
-              speaker_labels: true
+              speaker_labels: true,
+              speech_model: 'universal-2'
             }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
+            console.log('Diarization job submitted:', diarJob.data.id);
             for (let i = 0; i < 30; i++) {
               await new Promise(r => setTimeout(r, 3000));
               const poll = await axios.get('https://api.assemblyai.com/v2/transcript/'+diarJob.data.id, {
