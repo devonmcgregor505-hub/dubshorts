@@ -332,7 +332,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
 
       <!-- Translate button -->
-      <button class="submit" id="translateBtn" onclick="startTranslation()">→ Translate to Spanish</button>
+      <button class="submit" id="translateBtn" onclick="testSpeakers()">🎙 Test Speaker Detection</button>
 
       <!-- Queue indicator -->
       <div class="queue-bar" id="queueBar">⏳ Your job is queued — please wait...</div>
@@ -353,6 +353,9 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
         <video id="resultVideo" controls playsinline style="width:100%;border-radius:7px;margin-top:5px;"></video>
         <a class="dl-btn" id="dlBtn" href="#" download="dubbed_video.mp4">⬇ Download Video</a>
       </div>
+
+      <!-- Speaker Results -->
+      <div class="done-box" id="speakerBox" style="display:none;"></div>
 
       <!-- Error -->
       <div class="err-box" id="errBox">
@@ -735,6 +738,71 @@ function hide(id){document.getElementById(id).style.display='none';}
 function soon(e){e.preventDefault();alert('Coming soon!');}
 
 // ── TRANSLATE ─────────────────────────────────────────────────────────────────
+async function testSpeakers() {
+  const f = fileInput.files[0]; if (!f) { alert('Please select a video'); return; }
+  document.getElementById('translateBtn').disabled = true;
+  hide('doneBox'); hide('errBox'); hide('speakerBox');
+  startProg();
+
+  const fd = new FormData();
+  fd.append('video', f);
+
+  try {
+    const res = await fetch('/test-speakers', { method: 'POST', body: fd });
+    const data = await res.json();
+    finishProg();
+    if (data.success) {
+      renderSpeakers(data.speakers, data.zipUrl);
+    } else {
+      show('errBox');
+      document.getElementById('errMsg').textContent = data.error;
+    }
+  } catch(err) {
+    finishProg();
+    show('errBox');
+    document.getElementById('errMsg').textContent = 'Could not reach the server.';
+  }
+  document.getElementById('translateBtn').disabled = false;
+}
+
+function renderSpeakers(speakers, zipUrl) {
+  const box = document.getElementById('speakerBox');
+  box.innerHTML = '';
+  const title = document.createElement('div');
+  title.className = 'done-title';
+  title.textContent = '// SPEAKER DETECTION DONE ✓';
+  box.appendChild(title);
+
+  for (const [speaker, clips] of Object.entries(speakers)) {
+    const section = document.createElement('div');
+    section.style = 'margin-top:14px;';
+    const h = document.createElement('div');
+    h.style = 'font-weight:700;font-size:13px;margin-bottom:6px;letter-spacing:1px;color:var(--acc);';
+    h.textContent = '🎤 SPEAKER ' + speaker + ' — ' + clips.length + ' clip(s)';
+    section.appendChild(h);
+    clips.forEach((clip, i) => {
+      const wrap = document.createElement('div');
+      wrap.style = 'margin-bottom:10px;background:rgba(255,255,255,0.04);border-radius:8px;padding:8px;';
+      wrap.innerHTML = \`
+        <div style="font-size:11px;color:#aaa;margin-bottom:4px;">Clip \${i+1} · \${clip.start}s · \${clip.dur}s — "\${clip.text}"</div>
+        <video controls playsinline style="width:100%;border-radius:6px;" src="\${clip.url}"></video>
+      \`;
+      section.appendChild(wrap);
+    });
+    box.appendChild(section);
+  }
+
+  const dl = document.createElement('a');
+  dl.href = zipUrl;
+  dl.download = 'speaker_clips.zip';
+  dl.className = 'dl-btn';
+  dl.style = 'margin-top:12px;display:block;';
+  dl.textContent = '⬇ Download All Clips (ZIP)';
+  box.appendChild(dl);
+
+  show('speakerBox');
+}
+
 async function startTranslation() {
   const f = fileInput.files[0]; if (!f) { alert('Please select a video'); return; }
   document.getElementById('translateBtn').disabled = true;

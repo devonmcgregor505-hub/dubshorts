@@ -622,6 +622,125 @@ app.get('/queue', (req, res) => {
   res.json({ active: activeJobs, waiting: queue.length, max: MAX_CONCURRENT });
 });
 
+
+app.post('/test-speakers', upload.single('video'), async (req, res) => {
+  const videoPath = path.resolve(req.file.path);
+  const timestamp = Date.now();
+  const outputClips = [];
+  const zipPath = path.resolve('outputs/speaker_test_'+timestamp+'.zip');
+
+  try {
+    if (!process.env.ASSEMBLYAI_API_KEY) throw new Error('ASSEMBLYAI_API_KEY not set');
+
+    // Extract audio
+    console.log('Extracting audio for diarization...');
+    const audioPath = path.resolve('uploads/diar_'+timestamp+'.mp3');
+    runFFmpeg(['-y','-i',videoPath,'-vn','-ac','1','-ar','16000','-c:a','mp3',audioPath], 60000);
+
+    // Upload to AssemblyAI
+    const audioBuffer = fs.readFileSync(audioPath);
+    const uploadRes = await axios.post('https://api.assemblyai.com/v2/upload', audioBuffer, {
+      headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY, 'content-type': 'application/octet-stream' },
+      timeout: 60000
+    });
+    try { fs.unlinkSync(audioPath); } catch(e) {}
+    console.log('Audio uploaded, submitting diarization job...');
+
+    // Submit diarization job
+    const jobRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
+      audio_url: uploadRes.data.upload_url,
+      speaker_labels: true,
+      speech_model: 'universal-2'
+    }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
+
+    const jobId = jobRes.data.id;
+    console.log('Diarization job:', jobId);
+
+    // Poll for result
+    let utterances = [];
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const poll = await axios.get('https://api.assemblyai.com/v2/transcript/'+jobId, {
+        headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 15000
+      });
+      console.log('Poll', i+1, ':', poll.data.status);
+      if (poll.data.status === 'completed') {
+        utterances = poll.data.utterances || [];
+        break;
+      }
+      if (poll.data.status === 'error') throw new Error('AssemblyAI error: ' + poll.data.error);
+    }
+
+    if (utterances.length === 0) throw new Error('No speaker segments detected');
+    console.log('Got', utterances.length, 'utterances');
+
+    // Cut clips per speaker
+    const clipsDir = path.resolve('outputs/clips_'+timestamp);
+    fs.mkdirSync(clipsDir, { recursive: true });
+    const speakerMap = {};
+
+    for (let i = 0; i < utterances.length; i++) {
+      const u = utterances[i];
+      const start = u.start / 1000;
+      const dur = (u.end - u.start) / 1000;
+      if (dur < 0.3) continue;
+      const clipName = `speaker_${u.speaker}_clip_${String(i).padStart(3,'0')}.mp4`;
+      const clipPath = path.resolve(clipsDir, clipName);
+      console.log(`Cutting clip ${i+1}/${utterances.length}: Speaker ${u.speaker} [${start.toFixed(1)}s, ${dur.toFixed(1)}s]`);
+      try {
+        runFFmpeg(['-y','-ss',String(start),'-i',videoPath,'-t',String(dur),
+          '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
+          '-avoid_negative_ts','make_zero',clipPath], 60000);
+        if (fs.existsSync(clipPath) && fs.statSync(clipPath).size > 1000) {
+          if (!speakerMap[u.speaker]) speakerMap[u.speaker] = [];
+          speakerMap[u.speaker].push({ clipName, text: u.text, start: start.toFixed(1), dur: dur.toFixed(1) });
+          outputClips.push(clipPath);
+          console.log('  Clip OK');
+        }
+      } catch(e) { console.log('  Clip failed:', e.message); }
+    }
+
+    // Zip all clips
+    const archiver = require('archiver');
+    const zipOut = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    await new Promise((resolve, reject) => {
+      zipOut.on('close', resolve);
+      archive.on('error', reject);
+      archive.pipe(zipOut);
+      outputClips.forEach(p => archive.file(p, { name: path.basename(p) }));
+      archive.finalize();
+    });
+
+    // Serve individual clips
+    const speakers = {};
+    for (const [speaker, clips] of Object.entries(speakerMap)) {
+      speakers[speaker] = clips.map(c => ({
+        url: '/outputs/clips_'+timestamp+'/'+c.clipName,
+        text: c.text,
+        start: c.start,
+        dur: c.dur
+      }));
+    }
+
+    // Cleanup uploads
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+
+    // Auto-delete clips after 10 mins
+    setTimeout(() => {
+      try { fs.rmSync(clipsDir, { recursive: true, force: true }); } catch(e) {}
+      try { fs.unlinkSync(zipPath); } catch(e) {}
+    }, 600000);
+
+    res.json({ success: true, speakers, zipUrl: '/outputs/speaker_test_'+timestamp+'.zip' });
+  } catch(err) {
+    console.error('test-speakers error:', err.message);
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
 app.listen(PORT, ()=>{ console.log('DubShorts running at http://localhost:'+PORT); });
 
 // TEMP: serve last audio for debugging
