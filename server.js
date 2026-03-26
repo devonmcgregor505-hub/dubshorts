@@ -531,7 +531,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
             init_video: videoUrl,
             source_lang: 'en',
             output_lang: lang,
-            num_speakers: 0,
+            num_speakers: 2,
             speed: 1.0,
             file_prefix: 'dub_'+lang+'_'+Date.now()+'_'+Math.random().toString(36).slice(2),
             base64: false, webhook: null, track_id: null
