@@ -442,11 +442,11 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
           if (speakerSegments.length > 0) {
             // Use speaker-separated dubbing
-            const mixedAudio = await dubWithSpeakerSeparation(cleanVideoPath, targetLang, speakerSegments, timestamp);
-            if (mixedAudio) {
-              runFFmpeg(['-y','-i',cleanVideoPath,'-i',mixedAudio,'-map','0:v','-map','1:a',
-                '-c:v','copy','-c:a','aac','-shortest',dubbedVideoPath], 120000);
-              try { fs.unlinkSync(mixedAudio); } catch(e) {}
+            const stitchedVideo = await dubWithSpeakerSeparation(cleanVideoPath, targetLang, speakerSegments, timestamp);
+            if (stitchedVideo) {
+              // stitchedVideo is already a full video with dubbed audio per speaker
+              fs.copyFileSync(stitchedVideo, dubbedVideoPath);
+              try { fs.unlinkSync(stitchedVideo); } catch(e) {}
               console.log('Speaker-separated dubbing complete!');
             } else {
               console.log('Speaker dubbing failed, falling back to full video dubbing...');
