@@ -603,7 +603,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
       } else {
         // Merge captioned video with ModelsLab dubbed audio
         console.log('Merging video + ModelsLab dubbed audio...');
-        runFFmpeg(['-y','-i',videoForMerge,'-i',dubbedVideoPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
+        // Use original video stream + dubbed audio to avoid freeze artifacts from re-encoding
+        runFFmpeg(['-y','-i',videoPath,'-i',dubbedVideoPath,'-map','0:v','-map','1:a','-c:v','copy','-c:a','aac','-shortest',outputPath], 180000);
       }
       const outSize = fs.existsSync(outputPath) ? fs.statSync(outputPath).size : 0;
       console.log('Done! Output size:', outSize, 'bytes');
