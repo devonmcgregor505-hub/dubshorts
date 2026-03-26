@@ -463,7 +463,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           // Stitch segments back together
           console.log('Stitching', dubbedSegments.length, 'segments...');
           const concatList = path.resolve('uploads/concat_'+timestamp+'.txt');
-          const concatLines = dubbedSegments.map(s => 'file ''+s.path.replace(/'/g, "'\''")+''').join('
+          const concatLines = dubbedSegments.map(s => `file '${s.path}'`).join('\n');
 ');
           fs.writeFileSync(concatList, concatLines);
           runFFmpeg(['-y','-f','concat','-safe','0','-i',concatList,'-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',dubbedVideoPath], 300000);
