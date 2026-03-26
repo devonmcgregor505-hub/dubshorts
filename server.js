@@ -271,8 +271,7 @@ async function dubWithSpeakerSeparation(videoPath, targetLang, speakerSegments, 
     // Stitch all clips together
     console.log(`Stitching ${clips.length} clips...`);
     const concatFile = path.resolve(clipsDir, 'concat.txt');
-    fs.writeFileSync(concatFile, clips.map(p => `file '${p}'`).join('
-'));
+    fs.writeFileSync(concatFile, clips.map(p => 'file \'' + p + '\'').join('\n'));
     const stitchedPath = path.resolve(clipsDir, 'stitched.mp4');
     runFFmpeg(['-y','-f','concat','-safe','0','-i',concatFile,
       '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
