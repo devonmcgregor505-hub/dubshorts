@@ -382,6 +382,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         const diarTranscript = await axios.post('https://api.assemblyai.com/v2/transcript', {
           audio_url: diarUpload.data.upload_url,
           speaker_labels: true,
+          speech_model: 'universal-2',
         }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
 
         const diarId = diarTranscript.data.id;
