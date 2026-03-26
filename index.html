@@ -756,10 +756,20 @@ async function startTranslation() {
     finishProg();
     if (data.success) {
       show('doneBox');
-      document.getElementById('resultVideo').src = data.videoUrl;
-      document.getElementById('dlBtn').href = data.videoUrl;
-      if (data.cached) document.querySelector('.done-title').textContent = '// DONE ✓ (cached)';
-      else document.querySelector('.done-title').textContent = '// DONE ✓';
+      if (data.multiSpeaker && data.zipUrl) {
+        document.querySelector('.done-title').textContent = '// DONE ✓ Multi-Speaker Clips';
+        document.getElementById('resultVideo').style.display = 'none';
+        document.getElementById('dlBtn').href = data.zipUrl;
+        document.getElementById('dlBtn').textContent = '⬇ Download Dubbed Clips (ZIP)';
+        document.getElementById('dlBtn').download = 'dubbed_clips.zip';
+      } else {
+        document.getElementById('resultVideo').style.display = 'block';
+        document.getElementById('resultVideo').src = data.videoUrl;
+        document.getElementById('dlBtn').href = data.videoUrl;
+        document.getElementById('dlBtn').download = 'dubbed_video.mp4';
+        if (data.cached) document.querySelector('.done-title').textContent = '// DONE ✓ (cached)';
+        else document.querySelector('.done-title').textContent = '// DONE ✓';
+      }
     } else {
       show('errBox');
       document.getElementById('errMsg').textContent = data.error;
