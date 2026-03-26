@@ -246,6 +246,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
   let captionStyle = null;
   if (req.body.captionStyle) { try { captionStyle = JSON.parse(req.body.captionStyle); } catch(e) {} }
   const targetLang = req.body.language || 'es';
+  const provider = req.body.provider || 'modelslab';
 
   // Cache check
   const fileBuffer = fs.readFileSync(videoPath);
