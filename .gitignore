@@ -8,3 +8,10 @@ uploads/
 .env
 cache/
 venv/
+venv/
+node_modules/
+uploads/
+outputs/
+cache/
+*.pyc
+__pycache__/
