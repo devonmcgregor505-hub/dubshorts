@@ -355,106 +355,22 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         }
       }
 
-      // Dubbing with speaker separation
+      // Dubbing
       if (targetLang !== 'none') {
         try {
-          // First get speaker segments from AssemblyAI
-          let speakerSegments = [];
-          try {
-            if (!process.env.ASSEMBLYAI_API_KEY || process.env.ASSEMBLYAI_API_KEY === 'your_key_here') throw new Error('ASSEMBLYAI_API_KEY not set');
-            console.log('Getting speaker diarization...');
-            const diarAudioPath = path.resolve('uploads/diar_'+timestamp+'.mp3');
-            runFFmpeg(['-y','-i',cleanVideoPath,'-vn','-ac','1','-ar','16000','-c:a','mp3',diarAudioPath], 60000);
-            const diarBuffer = fs.readFileSync(diarAudioPath);
-            const diarUpload = await axios.post('https://api.assemblyai.com/v2/upload', diarBuffer, {
-              headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY, 'content-type': 'application/octet-stream' },
-              timeout: 60000
-            });
-            try { fs.unlinkSync(diarAudioPath); } catch(e) {}
-            console.log('Submitting diarization job...');
-            const diarJob = await axios.post('https://api.assemblyai.com/v2/transcript', {
-              audio_url: diarUpload.data.upload_url,
-              speaker_labels: true,
-              speech_models: ['universal-2']
-            }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
-            console.log('Diarization job submitted:', diarJob.data.id);
-            for (let i = 0; i < 30; i++) {
-              await new Promise(r => setTimeout(r, 3000));
-              const poll = await axios.get('https://api.assemblyai.com/v2/transcript/'+diarJob.data.id, {
-                headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 15000
-              });
-              if (poll.data.status === 'completed') {
-                speakerSegments = (poll.data.utterances || []).map(u => ({
-                  speaker: u.speaker, text: u.text, start: u.start/1000, end: u.end/1000
-                }));
-                console.log('Got', speakerSegments.length, 'speaker segments');
-                break;
-              }
-              if (poll.data.status === 'error') break;
-            }
-          } catch(e) { console.log('Diarization failed:', e.message); if(e.response) console.log('Diarization 400 body:', JSON.stringify(e.response.data).slice(0,300)); }
-
-          if (speakerSegments.length > 0) {
-            // Use speaker-separated dubbing
-            const stitchedVideo = await dubWithSpeakerSeparation(cleanVideoPath, targetLang, speakerSegments, timestamp);
-            if (stitchedVideo) {
-              // stitchedVideo is already a full video with dubbed audio per speaker
-              fs.copyFileSync(stitchedVideo, dubbedVideoPath);
-              try { fs.unlinkSync(stitchedVideo); } catch(e) {}
-              console.log('Speaker-separated dubbing complete!');
-            } else {
-              console.log('Speaker dubbing failed, falling back to full video dubbing...');
-              speakerSegments = []; // trigger fallback below
-            }
-          }
-
-          if (speakerSegments.length === 0 && !require('fs').existsSync(dubbedVideoPath)) {
-            // Fallback: dub full video
-            console.log('Uploading to temp storage for dubbing...');
-          const uploadForm = new FormData();
-          uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
-          const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
-          const videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
-          console.log('Video URL:', videoUrl);
-
-          const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
-          const lang = langMap[targetLang] || 'es';
-          const dubRes = await axios.post('https://modelslab.com/api/v6/voice/create_dubbing', {
-            key: process.env.MODELSLAB_API_KEY,
-            init_video: videoUrl,
-            source_lang: 'en',
-            output_lang: lang,
-            num_speakers: 0,
-            speed: 1.0,
-            file_prefix: 'dub_'+lang+'_'+Date.now()+'_'+Math.random().toString(36).slice(2),
-            base64: false, webhook: null, track_id: null
-          }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
-
-          console.log('ModelsLab response:', JSON.stringify(dubRes.data).slice(0, 200));
-
-          let dubbedUrl = null;
-          if (dubRes.data.status === 'success' && dubRes.data.output?.[0]) {
-            dubbedUrl = dubRes.data.output[0];
-          } else if (dubRes.data.status === 'processing' && dubRes.data.fetch_result) {
-            for (let attempts = 0; attempts < 60; attempts++) {
-              await new Promise(r => setTimeout(r, 5000));
-              const poll = await axios.post(dubRes.data.fetch_result, { key: process.env.MODELSLAB_API_KEY }, {
-                headers: { 'Content-Type': 'application/json' }, timeout: 30000
-              });
-              console.log('Poll ' + (attempts+1) + ': ' + poll.data.status);
-              if (poll.data.status === 'success' && poll.data.output?.[0]) {
-                dubbedUrl = poll.data.output[0];
-                break;
-              }
-            }
-          }
-
+          console.log('Uploading to R2 for ModelsLab...');
+          const r2Key = 'dub_input_' + timestamp + '.mp4';
+          const videoUrl = await uploadToR2(cleanVideoPath, r2Key);
+          console.log('R2 URL ready');
+          const langMap = { es: 'es', hi: 'hi', pt: 'pt-br', ja: 'ja', fr: 'fr', pl: 'pl', it: 'it', zh: 'zh' };
+          const lang = langMap[targetLang] || targetLang;
+          const dubbedUrl = await dubVideoUrl(videoUrl, lang, 'dub_'+lang+'_'+timestamp);
           if (dubbedUrl) {
             const dlRes = await axios.get(dubbedUrl, { responseType: 'arraybuffer', timeout: 120000 });
             fs.writeFileSync(dubbedVideoPath, dlRes.data);
             console.log('Dubbing complete! Size:', dlRes.data.byteLength);
           } else {
-            console.log('Dubbing failed or timed out - using original audio');
+            console.log('Dubbing failed - using original');
             fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
           }
         } catch(e) {
