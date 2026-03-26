@@ -346,6 +346,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
         <div class="done-title">// DONE ✓</div>
         <video id="resultVideo" controls playsinline style="width:100%;border-radius:7px;margin-top:5px;"></video>
         <a class="dl-btn" id="dlBtn" href="#" download="dubbed_video.mp4">⬇ Download Video</a>
+        <div id="speakerClips" style="margin-top:16px;"></div>
       </div>
 
       <!-- Error -->
@@ -731,13 +732,16 @@ async function startTranslation() {
   if (document.getElementById('removeToggle').checked) fd.append('removeCaption', 'true');
 
   try {
-    const res = await fetch('/translate', { method: 'POST', body: fd });
+    const res = await fetch("/dub-speakers", { method: "POST", body: fd });
     const data = await res.json();
     finishProg();
     if (data.success) {
       show('doneBox');
       document.getElementById('resultVideo').src = data.videoUrl;
-      document.getElementById('dlBtn').href = data.videoUrl;
+      document.getElementById("dlBtn").href = data.videoUrl;
+      const clips = document.getElementById("speakerClips");
+      clips.innerHTML = "";
+      if (data.speakers) { Object.entries(data.speakers).forEach(([spk, segs]) => { clips.innerHTML += `<div style="margin-bottom:12px"><div style="font-size:11px;color:#e8ff47;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">Speaker ${spk}</div>${segs.map(s => `<div style="background:#111;border:1px solid #222;border-radius:4px;padding:10px;margin-bottom:6px"><div style="font-size:11px;color:#555;margin-bottom:4px">${s.start}s — "${s.text}"</div><audio controls src="${s.url}" style="width:100%;height:32px"></audio></div>`).join("")}</div>`; }); }
       document.querySelector('.done-title').textContent = data.cached ? '// DONE ✓ (cached)' : '// DONE ✓';
     } else {
       show('errBox');
