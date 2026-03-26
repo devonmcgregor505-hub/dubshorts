@@ -1,74 +1,101 @@
-// Complete working implementation of speaker-isolated dubbing
-
 const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
-const { AssemblyAI } = require('assemblyai-sdk');
-const ModelsLab = require('models-lab-sdk');
+const AssemblyAI = require('assemblyai');
 
-// Function to extract audio from video
-async function extractAudio(videoPath, audioPath) {
+// Initialize AssemblyAI API client
+const assembly = new AssemblyAI(process.env.ASSEMBLYAI_API_KEY);
+
+/**
+ * Extracts audio from a video file.
+ */
+function extractAudio(videoFilePath, outputAudioPath) {
     return new Promise((resolve, reject) => {
-        ffmpeg(videoPath)
-            .toFormat('wav')
-            .on('end', () => resolve(audioPath))
+        ffmpeg(videoFilePath)
+            .output(outputAudioPath)
+            .on('end', () => resolve())
             .on('error', (err) => reject(err))
-            .save(audioPath);
+            .run();
     });
 }
 
-// Function for diarization and speaker detection using AssemblyAI
-async function diarizeAudio(audioPath) {
-    const assemblyai = new AssemblyAI();
-    const transcript = await assemblyai.transcribe(audioPath);
-    return transcript; // Assuming it includes speaker labels and timestamps
+/**
+ * Detect speakers in the audio using AssemblyAI.
+ */
+async function detectSpeakers(audioFilePath) {
+    const audioData = fs.readFileSync(audioFilePath);
+    const response = await assembly.transcript.create({ audio_data: audioData });
+    return response;
 }
 
-// Split audio by speaker using FFmpeg
-async function splitAudioBySpeaker(diarization, originalAudio) {
-    // Implement logic to split audio using speaker data from diarization
-    // and save them as separate audio files
+/**
+ * Splits audio by speaker timestamps.
+ */
+async function splitAudioByTimestamps(audioFilePath, timestamps) {
+    // Logic to split the audio using ffmpeg
+    const promises = timestamps.map((timestamp, index) => {
+        // Assume we save each segment in `segment-${index}.wav`
+        return new Promise((resolve, reject) => {
+            ffmpeg(audioFilePath)
+                .setStartTime(timestamp.start)
+                .setDuration(timestamp.end - timestamp.start)
+                .output(`segment-${index}.wav`)
+                .on('end', () => resolve(`segment-${index}.wav`))
+                .on('error', (err) => reject(err))
+                .run();
+        });
+    });
+    return Promise.all(promises);
 }
 
-// Function to dub audio using ModelsLab API
-async function dubAudio(speakerAudioPath, speaker) {
-    const modelsLab = new ModelsLab();
-    const dubbedAudio = await modelsLab.dub(speakerAudioPath, { speaker });
-    return dubbedAudio;
+/**
+ * Dub audio using ModelsLab per-speaker models.
+ */
+async function dubAudioWithModel(segmentFilePath, speakerModel) {
+    // Implement dubbing logic using ModelsLab API
+    // Return path to dubbed audio
+    return `dubbed-${segmentFilePath}`; // Placeholder for actual dubbing logic
 }
 
-// Function to reassemble audio
-async function assembleAudio() {
-    // Logic to combine all dubbed audio tracks into one
-}
+/**
+ * Reassemble dubbed audio using ffmpeg concat.
+ */
+async function reassembleAudio(segmentPaths, outputPath) {
+    const concatFilePath = 'concat.txt';
+    const concatData = segmentPaths.map(path => `file '${path}'`).join('\n');
+    fs.writeFileSync(concatFilePath, concatData);
 
-// Function to combine the dubbed audio with the original video
-async function combineVideoAndAudio(videoPath, dubbedAudioPath, outputPath) {
     return new Promise((resolve, reject) => {
-        ffmpeg(videoPath)
-            .input(dubbedAudioPath)
-            .outputOptions('-map 0:v', '-map 1:a')
-            .on('end', () => resolve(outputPath))
+        ffmpeg()
+            .input(concatFilePath)
+            .outputOptions('-f concat')
+            .output(outputPath)
+            .on('end', () => resolve())
             .on('error', (err) => reject(err))
-            .save(outputPath);
+            .run();
     });
 }
 
-// Main function to execute the pipeline
-async function runDubbingPipeline(videoPath) {
-    try {
-        const audioPath = 'extracted_audio.wav';
-        await extractAudio(videoPath, audioPath);
-        const diarization = await diarizeAudio(audioPath);
-        await splitAudioBySpeaker(diarization, audioPath);
-        // Iterate over split audio, dub using ModelsLab and reassemble
-        const dubbedAudioPath = 'dubbed_audio.wav';
-        await assembleAudio(dubbedAudioPath);
-        const outputVideoPath = 'final_output.mp4';
-        await combineVideoAndAudio(videoPath, dubbedAudioPath, outputVideoPath);
-        console.log('Dubbing pipeline executed successfully.');
-    } catch (error) {
-        console.error('Error executing dubbing pipeline:', error);
-    }
+/**
+ * Mute the original video audio while merging dubbed audio.
+ */
+function muteOriginalVideo(videoFilePath, outputVideoPath, audioFilePath) {
+    return new Promise((resolve, reject) => {
+        ffmpeg(videoFilePath)
+            .audioCodec('aac')
+            .audioFilters('volume=0') // Mute original audio
+            .input(audioFilePath)
+            .output(outputVideoPath)
+            .on('end', () => resolve())
+            .on('error', (err) => reject(err))
+            .run();
+    });
 }
 
-runDubbingPipeline('input_video.mp4');
+module.exports = {
+    extractAudio,
+    detectSpeakers,
+    splitAudioByTimestamps,
+    dubAudioWithModel,
+    reassembleAudio,
+    muteOriginalVideo
+};
