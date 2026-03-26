@@ -461,14 +461,34 @@ app.post('/translate', upload.single('video'), async (req, res) => {
             try { fs.unlinkSync(segPath); } catch(e) {}
           }
 
-          // Stitch segments back together
-          console.log('Stitching', dubbedSegments.length, 'segments...');
+          // Normalize each segment timestamps before concat
+          console.log('Normalizing segments...');
+          const normalizedSegments = [];
+          for (let i = 0; i < dubbedSegments.length; i++) {
+            const normPath = path.resolve('uploads/norm_'+timestamp+'_'+i+'.mp4');
+            runFFmpeg(['-y','-i',dubbedSegments[i].path,
+              '-c:v','libx264','-preset','ultrafast','-crf','23',
+              '-c:a','aac','-ar','44100','-ac','2',
+              '-video_track_timescale','90000',
+              '-vsync','cfr','-r','24',
+              normPath], 120000);
+            if (fs.existsSync(normPath)) {
+              normalizedSegments.push(normPath);
+            }
+            try { fs.unlinkSync(dubbedSegments[i].path); } catch(e) {}
+          }
+
+          // Stitch normalized segments back together
+          console.log('Stitching', normalizedSegments.length, 'segments...');
           const concatList = path.resolve('uploads/concat_'+timestamp+'.txt');
-          const concatLines = dubbedSegments.map(s => `file '${s.path}'`).join('\n');
+          const concatLines = normalizedSegments.map(s => `file '${s}'`).join('\n');
           fs.writeFileSync(concatList, concatLines);
-          runFFmpeg(['-y','-f','concat','-safe','0','-i',concatList,'-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',dubbedVideoPath], 300000);
+          runFFmpeg(['-y','-f','concat','-safe','0','-i',concatList,
+            '-c:v','libx264','-preset','ultrafast','-crf','23',
+            '-c:a','aac','-ar','44100','-ac','2',
+            dubbedVideoPath], 300000);
           try { fs.unlinkSync(concatList); } catch(e) {}
-          dubbedSegments.forEach(s => { try { fs.unlinkSync(s.path); } catch(e) {} });
+          normalizedSegments.forEach(p => { try { fs.unlinkSync(p); } catch(e) {} });
           console.log('Multi-speaker dubbing complete!');
         }
       }
