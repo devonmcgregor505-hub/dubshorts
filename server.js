@@ -396,7 +396,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
             console.log('Dubbing failed or timed out - using original audio');
             fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
           }
-          } // end fallback
+          } // end single speaker fallback
         } catch(e) {
           console.log('Dubbing error:', e.message);
           fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
