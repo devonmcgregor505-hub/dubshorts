@@ -298,10 +298,59 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         }
       }
 
-      // Dubbing
+      // Dubbing with speaker separation
       if (targetLang !== 'none') {
         try {
-          console.log('Uploading to temp storage for dubbing...');
+          // First get speaker segments from AssemblyAI
+          let speakerSegments = [];
+          try {
+            console.log('Getting speaker diarization...');
+            const diarAudioPath = path.resolve('uploads/diar_'+timestamp+'.mp3');
+            runFFmpeg(['-y','-i',cleanVideoPath,'-vn','-ac','1','-ar','16000','-c:a','mp3',diarAudioPath], 60000);
+            const diarBuffer = fs.readFileSync(diarAudioPath);
+            const diarUpload = await axios.post('https://api.assemblyai.com/v2/upload', diarBuffer, {
+              headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY, 'content-type': 'application/octet-stream' },
+              timeout: 60000
+            });
+            try { fs.unlinkSync(diarAudioPath); } catch(e) {}
+            const diarJob = await axios.post('https://api.assemblyai.com/v2/transcript', {
+              audio_url: diarUpload.data.upload_url,
+              speaker_labels: true,
+              word_boost: []
+            }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
+            for (let i = 0; i < 30; i++) {
+              await new Promise(r => setTimeout(r, 3000));
+              const poll = await axios.get('https://api.assemblyai.com/v2/transcript/'+diarJob.data.id, {
+                headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 15000
+              });
+              if (poll.data.status === 'completed') {
+                speakerSegments = (poll.data.utterances || []).map(u => ({
+                  speaker: u.speaker, text: u.text, start: u.start/1000, end: u.end/1000
+                }));
+                console.log('Got', speakerSegments.length, 'speaker segments');
+                break;
+              }
+              if (poll.data.status === 'error') break;
+            }
+          } catch(e) { console.log('Diarization failed:', e.message); }
+
+          if (speakerSegments.length > 0) {
+            // Use speaker-separated dubbing
+            const mixedAudio = await dubWithSpeakerSeparation(cleanVideoPath, targetLang, speakerSegments, timestamp);
+            if (mixedAudio) {
+              runFFmpeg(['-y','-i',cleanVideoPath,'-i',mixedAudio,'-map','0:v','-map','1:a',
+                '-c:v','copy','-c:a','aac','-shortest',dubbedVideoPath], 120000);
+              try { fs.unlinkSync(mixedAudio); } catch(e) {}
+              console.log('Speaker-separated dubbing complete!');
+            } else {
+              console.log('Speaker dubbing failed, falling back to full video dubbing...');
+              speakerSegments = []; // trigger fallback below
+            }
+          }
+
+          if (speakerSegments.length === 0) {
+            // Fallback: dub full video
+            console.log('Uploading to temp storage for dubbing...');
           const uploadForm = new FormData();
           uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
           const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
@@ -348,6 +397,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
             console.log('Dubbing failed or timed out - using original audio');
             fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
           }
+          } // end fallback
         } catch(e) {
           console.log('Dubbing error:', e.message);
           fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
