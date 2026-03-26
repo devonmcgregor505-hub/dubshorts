@@ -4,3 +4,5 @@ uploads
 outputs/
 outputs/
 uploads/
+.aider*
+.env

@@ -1,0 +1,19 @@
+Subject: Multi-speaker dubbing not working on PAYG
+
+Hi ModelsLab Support,
+
+I'm on PAYG and trying to dub a video with 2 speakers (man and woman) to Spanish.
+All my API calls succeed, but both speakers get the same voice in the output.
+
+I've tried:
+- num_speakers: 2
+- num_speakers: 0
+- speaker_detection: auto
+- multi_speaker: true
+- separate_voices: true
+
+Does PAYG support multi-voice dubbing, or do I need to upgrade to Standard/Unlimited?
+
+API Key: a9V81wSBotSSxDjfjlLlD6BvStBXb57qZoJnPIutf0XLaBAoyYLUJypZUrjR
+
+Thanks!
