@@ -62,17 +62,11 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 .lang-sel{background:var(--s2);border:1px solid var(--bd);color:var(--tx);padding:9px 11px;border-radius:8px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;width:100%;}
 .lang-sel:focus{border-color:rgba(245,225,50,.4);}
 
-/* Provider buttons */
-.provider-row{display:flex;gap:8px;}
-.prov-btn{flex:1;padding:9px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;border:1px solid var(--bd);background:var(--s2);color:var(--tdim);transition:all .15s;}
-.prov-btn.active{background:var(--yg);border-color:rgba(245,225,50,.35);color:var(--y);}
-.prov-btn:hover{border-color:var(--yd);}
-
 /* Toggles */
 .tog-row{display:flex;gap:8px;}
-.tc.active{border:2px solid #f5c518;box-shadow:0 0 10px rgba(245,197,24,0.3);}
-.tc{flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:10px 11px;display:flex;align-items:center;gap:8px;transition:all .15s;}
+.tc{flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:10px 11px;display:flex;align-items:center;gap:8px;transition:all .15s;cursor:pointer;}
 .tc.on{border-color:rgba(245,225,50,.22);background:var(--yg);}
+.tc.active{border:2px solid #f5c518;box-shadow:0 0 10px rgba(245,197,24,0.3);}
 .tc-ic{font-size:13px;flex-shrink:0;}
 .tc-info{flex:1;min-width:0;}
 .tc-title{font-size:12px;font-weight:600;}
@@ -113,8 +107,8 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 .hc-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--tmut);flex:1;}
 
 /* Save preset */
-.preset-btn{width:100%;padding:10px;background:var(--grn);color:#000;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;transition:all .2s;opacity:0.9;}
-.preset-btn:hover{opacity:1;box-shadow:0 4px 14px rgba(46,204,113,.2);}
+.preset-btn{width:100%;padding:10px;background:var(--s3);color:var(--tx);border:1px solid var(--bd);border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;transition:all .2s;}
+.preset-btn:hover{border-color:var(--y);color:var(--y);}
 
 /* Submit */
 .submit{width:100%;padding:12px;background:var(--y);color:var(--blk);border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;transition:all .2s;}
@@ -183,7 +177,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
   <div class="topbar">
     <span class="pg-title">Dubbing</span>
     <span class="pg-sep"> / </span>
-    <span class="pg-sub">Translate video to Spanish</span>
+    <span class="pg-sub" id="topbarSub">Translate video</span>
     <div class="pill">● Live</div>
   </div>
 
@@ -202,7 +196,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
       <!-- Language -->
       <div class="lang-row">
         <div class="lang-lbl">Select Language</div>
-        <select class="lang-sel" id="langSelect">
+        <select class="lang-sel" id="langSelect" onchange="onLangChange()">
           <option value="none">🔇 None (No Translation)</option>
           <option value="es">🇪🇸 Spanish</option>
           <option value="hi">🇮🇳 Hindi</option>
@@ -210,14 +204,14 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
           <option value="ja">🇯🇵 Japanese</option>
           <option value="fr">🇫🇷 French</option>
           <option value="pl">🇵🇱 Polish</option>
+          <option value="it">🇮🇹 Italian</option>
+          <option value="zh">🇨🇳 Chinese</option>
         </select>
       </div>
 
-
-
       <!-- Toggles -->
       <div class="tog-row">
-        <div class="tc" id="removeCard" onclick="document.getElementById('removeToggle').click();" style="cursor:pointer;">
+        <div class="tc" id="removeCard" onclick="document.getElementById('removeToggle').click();">
           <div class="tc-ic">🗑</div>
           <div class="tc-info">
             <div class="tc-title">Remove Captions</div>
@@ -229,7 +223,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
             <div class="tog-thumb"></div>
           </label>
         </div>
-        <div class="tc" id="addCard" onclick="document.getElementById('addToggle').click();" style="cursor:pointer;">
+        <div class="tc" id="addCard" onclick="document.getElementById('addToggle').click();">
           <div class="tc-ic">💬</div>
           <div class="tc-info">
             <div class="tc-title">Add Captions</div>
@@ -248,91 +242,91 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
         <div class="sp-hd" onclick="toggleStylePanel()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">Caption Style <span id="styleArrow">▼</span></div>
         <div id="styleInner">
 
-        <div class="ypos-row">
-          <div class="ypos-lbl"><span>Vertical Position</span><span id="yposVal">70%</span></div>
-          <input type="range" id="yPos" min="5" max="95" value="70" step="1" style="width:100%;accent-color:var(--y);" oninput="onYPos()">
-          <div class="ypos-marks"><span>Top</span><span>Center</span><span>Bottom</span></div>
-        </div>
+          <div class="ypos-row">
+            <div class="ypos-lbl"><span>Vertical Position</span><span id="yposVal">70%</span></div>
+            <input type="range" id="yPos" min="5" max="95" value="70" step="1" style="width:100%;accent-color:var(--y);" oninput="onYPos()">
+            <div class="ypos-marks"><span>Top</span><span>Center</span><span>Bottom</span></div>
+          </div>
 
-        <!-- Caption Mode -->
-        <div class="sfi">
-          <label>Caption Mode</label>
-          <div class="mode-row">
-            <button class="mode-btn active" id="modeSingle" onclick="setMode('single')">Single Word</button>
-            <button class="mode-btn" id="modeMulti" onclick="setMode('multi')">Multi Word</button>
-            <button class="mode-btn" id="modeHighlight" onclick="setMode('highlight')">✨ Highlight</button>
+          <!-- Caption Mode -->
+          <div class="sfi">
+            <label>Caption Mode</label>
+            <div class="mode-row">
+              <button class="mode-btn active" id="modeSingle" onclick="setMode('single');savePreset();">Single Word</button>
+              <button class="mode-btn" id="modeMulti" onclick="setMode('multi');savePreset();">Multi Word</button>
+              <button class="mode-btn" id="modeHighlight" onclick="setMode('highlight');savePreset();">✨ Highlight</button>
+            </div>
           </div>
-        </div>
 
-        <!-- Highlight color (shown in highlight mode) -->
-        <div class="hc-row" id="hlColorRow" style="display:none">
-          <span class="hc-lbl">Highlight Color</span>
-          <input type="color" id="highlightColor" value="#f5e132" style="width:50px;height:26px;border:1px solid var(--bd);border-radius:5px;background:var(--s3);cursor:pointer;" oninput="drawOverlay()">
-        </div>
+          <!-- Highlight color -->
+          <div class="hc-row" id="hlColorRow" style="display:none">
+            <span class="hc-lbl">Highlight Color</span>
+            <input type="color" id="highlightColor" value="#f5e132" style="width:50px;height:26px;border:1px solid var(--bd);border-radius:5px;background:var(--s3);cursor:pointer;" oninput="drawOverlay();savePreset();">
+          </div>
 
-        <div class="sg" style="margin-top:10px;">
-          <div class="sfi">
-            <label>Font</label>
-            <select id="fontFamily" onchange="drawOverlay()">
-              <option value="CaptionFont">DejaVu Bold</option>
-              <option value="serif">Serif</option>
-              <option value="sans-serif" selected>Sans-serif</option>
-              <option value="monospace">Monospace</option>
-            </select>
+          <div class="sg" style="margin-top:10px;">
+            <div class="sfi">
+              <label>Font</label>
+              <select id="fontFamily" onchange="drawOverlay();savePreset();">
+                <option value="CaptionFont">DejaVu Bold</option>
+                <option value="serif">Serif</option>
+                <option value="sans-serif" selected>Sans-serif</option>
+                <option value="monospace">Monospace</option>
+              </select>
+            </div>
+            <div class="sfi">
+              <label>Style</label>
+              <select id="textStyle" onchange="drawOverlay();savePreset();">
+                <option value="bold">Bold</option>
+                <option value="normal">Normal</option>
+                <option value="italic">Italic</option>
+                <option value="bold italic">Bold Italic</option>
+              </select>
+            </div>
+            <div class="sfi">
+              <label>Case</label>
+              <select id="textCase" onchange="drawOverlay();savePreset();">
+                <option value="upper">UPPERCASE</option>
+                <option value="normal">Normal</option>
+                <option value="lower">lowercase</option>
+              </select>
+            </div>
           </div>
-          <div class="sfi">
-            <label>Style</label>
-            <select id="textStyle" onchange="drawOverlay()">
-              <option value="bold">Bold</option>
-              <option value="normal">Normal</option>
-              <option value="italic">Italic</option>
-              <option value="bold italic">Bold Italic</option>
-            </select>
-          </div>
-          <div class="sfi">
-            <label>Case</label>
-            <select id="textCase" onchange="drawOverlay()">
-              <option value="upper">UPPERCASE</option>
-              <option value="normal">Normal</option>
-              <option value="lower">lowercase</option>
-            </select>
-          </div>
-        </div>
 
-        <div class="sg2">
-          <div class="sfi">
-            <label>Size <span class="rv" id="sizeVal">4%</span></label>
-            <div class="rr"><input type="range" id="fontSize" min="2" max="12" value="4" step=".5" oninput="document.getElementById('sizeVal').textContent=this.value+'%';drawOverlay()"></div>
+          <div class="sg2">
+            <div class="sfi">
+              <label>Size <span class="rv" id="sizeVal">4%</span></label>
+              <div class="rr"><input type="range" id="fontSize" min="2" max="12" value="4" step=".5" oninput="document.getElementById('sizeVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
+            </div>
+            <div class="sfi">
+              <label>Outline <span class="rv" id="outlineVal">15%</span></label>
+              <div class="rr"><input type="range" id="outlineWidth" min="0" max="40" value="15" step="1" oninput="document.getElementById('outlineVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
+            </div>
+            <div class="sfi">
+              <label>Text Color</label>
+              <input type="color" id="textColor" value="#ffffff" oninput="drawOverlay();savePreset();">
+            </div>
+            <div class="sfi">
+              <label>Outline Color</label>
+              <input type="color" id="outlineColor" value="#000000" oninput="drawOverlay();savePreset();">
+            </div>
           </div>
-          <div class="sfi">
-            <label>Outline <span class="rv" id="outlineVal">15%</span></label>
-            <div class="rr"><input type="range" id="outlineWidth" min="0" max="40" value="15" step="1" oninput="document.getElementById('outlineVal').textContent=this.value+'%';drawOverlay()"></div>
-          </div>
-          <div class="sfi">
-            <label>Text Color</label>
-            <input type="color" id="textColor" value="#ffffff" oninput="drawOverlay()">
-          </div>
-          <div class="sfi">
-            <label>Outline Color</label>
-            <input type="color" id="outlineColor" value="#000000" oninput="drawOverlay()">
-          </div>
-        </div>
 
-        <!-- Shadow -->
-        <div class="sg3">
-          <div class="sfi" style="margin-top:8px;">
-            <label>Shadow <span class="rv" id="shadowVal">0%</span></label>
-            <div class="rr"><input type="range" id="shadowSize" min="0" max="50" value="0" step="1" oninput="document.getElementById('shadowVal').textContent=this.value+'%';drawOverlay()"></div>
+          <div class="sg3">
+            <div class="sfi" style="margin-top:8px;">
+              <label>Shadow <span class="rv" id="shadowVal">0%</span></label>
+              <div class="rr"><input type="range" id="shadowSize" min="0" max="50" value="0" step="1" oninput="document.getElementById('shadowVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
+            </div>
           </div>
-        </div>
+
         </div>
       </div>
 
       <!-- Save Preset -->
-
+      <button class="preset-btn" id="savePresetBtn" onclick="savePreset()">💾 Save Preset</button>
 
       <!-- Translate button -->
-      <button class="submit" id="translateBtn" onclick="dubSpeakers()">🎙 Dub Speakers</button>
+      <button class="submit" id="translateBtn" onclick="startTranslation()">→ Translate to Spanish</button>
 
       <!-- Queue indicator -->
       <div class="queue-bar" id="queueBar">⏳ Your job is queued — please wait...</div>
@@ -353,9 +347,6 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
         <video id="resultVideo" controls playsinline style="width:100%;border-radius:7px;margin-top:5px;"></video>
         <a class="dl-btn" id="dlBtn" href="#" download="dubbed_video.mp4">⬇ Download Video</a>
       </div>
-
-      <!-- Speaker Results -->
-      <div class="done-box" id="speakerBox" style="display:none;"></div>
 
       <!-- Error -->
       <div class="err-box" id="errBox">
@@ -419,18 +410,16 @@ function savePreset() {
     removeCaption: document.getElementById('removeToggle').checked,
     addCaption: document.getElementById('addToggle').checked,
     captionBox: captionBox,
+    stylePanelOpen: document.getElementById('styleInner') ? document.getElementById('styleInner').style.display !== 'none' : true,
   };
   localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
-
   const btn = document.getElementById('savePresetBtn');
-  btn.textContent = '✓ Preset Saved!';
-  setTimeout(() => btn.textContent = '💾 Save Preset', 2000);
+  if (btn) { btn.textContent = '✓ Saved!'; setTimeout(() => btn.textContent = '💾 Save Preset', 2000); }
 }
 
 function loadPreset() {
   try {
     const preset = JSON.parse(localStorage.getItem('dubshorts_preset'));
-
     if (!preset) return;
     if (preset.yPct !== undefined) { captionYPct = preset.yPct; document.getElementById('yPos').value = preset.yPct; document.getElementById('yposVal').textContent = preset.yPct + '%'; }
     if (preset.fontFamily) document.getElementById('fontFamily').value = preset.fontFamily;
@@ -444,14 +433,17 @@ function loadPreset() {
     if (preset.captionMode) setMode(preset.captionMode);
     if (preset.highlightColor) document.getElementById('highlightColor').value = preset.highlightColor;
     if (preset.provider) setProvider(preset.provider);
-    if (preset.language) document.getElementById('langSelect').value = preset.language;
+    if (preset.language) { document.getElementById('langSelect').value = preset.language; updateTranslateBtn(); }
     if (preset.removeCaption) { document.getElementById('removeToggle').checked = true; onRemove(); }
     if (preset.addCaption) { document.getElementById('addToggle').checked = true; onAdd(); }
     if (preset.captionBox) {
       captionBox = preset.captionBox;
-      const clearBtn = document.getElementById('clearBtn');
-      if (clearBtn) clearBtn.style.display = 'flex';
+      document.getElementById('clearBtn').style.display = 'block';
       drawOverlay();
+    }
+    if (preset.stylePanelOpen === false) {
+      document.getElementById('styleInner').style.display = 'none';
+      document.getElementById('styleArrow').textContent = '▶';
     }
   } catch(e) { console.error('loadPreset error:', e); }
 }
@@ -467,8 +459,9 @@ function setProvider(p) {
 // ── CAPTION MODE ─────────────────────────────────────────────────────────────
 function setMode(mode) {
   captionMode = mode;
-  ['single','multi','highlight'].forEach(m => {
-    document.getElementById('mode'+m.charAt(0).toUpperCase()+m.slice(1)).classList.toggle('active', m === mode);
+  ['single', 'multi', 'highlight'].forEach(m => {
+    const el = document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1));
+    if (el) el.classList.toggle('active', m === mode);
   });
   document.getElementById('hlColorRow').style.display = mode === 'highlight' ? 'flex' : 'none';
   drawOverlay();
@@ -492,27 +485,24 @@ fileInput.addEventListener('change', () => {
     if (captionBox) { document.getElementById('clearBtn').style.display = 'block'; drawOverlay(); }
     if (document.getElementById('removeToggle').checked) { selCanvas.style.pointerEvents = 'auto'; selCanvas.style.cursor = 'crosshair'; }
   }, { once: true });
-  // Update translate button language label
   updateTranslateBtn();
   setTimeout(fitCanvas, 150);
   updateHint();
 });
 
-document.getElementById('langSelect').addEventListener('change', function(){
-  const lang = this.value;
-  const names = { none: 'Process Video', es: 'Spanish', hi: 'Hindi', pt: 'Portuguese', ja: 'Japanese', fr: 'French', pl: 'Polish' };
-  const btn = document.getElementById('translateBtn');
-  if (btn) btn.textContent = '→ ' + (names[lang] || lang);
+function onLangChange() {
+  updateTranslateBtn();
   savePreset();
-});
-document.getElementById('removeToggle').addEventListener('change', function(){ savePreset(); });
-document.getElementById('addToggle').addEventListener('change', function(){ savePreset(); });
+}
 
 function updateTranslateBtn() {
   const lang = document.getElementById('langSelect').value;
-  const langNames = { none: 'English (No Translation)', es: 'Spanish', hi: 'Hindi', pt: 'Portuguese', ja: 'Japanese', fr: 'French', pl: 'Polish' };
+  const langNames = { none: 'Process Video', es: 'Spanish', hi: 'Hindi', pt: 'Portuguese', ja: 'Japanese', fr: 'French', pl: 'Polish', it: 'Italian', zh: 'Chinese' };
   const btn = document.getElementById('translateBtn');
-  if (btn) btn.textContent = '→ ' + (langNames[lang] || lang);
+  const sub = document.getElementById('topbarSub');
+  if (btn) btn.textContent = '→ Translate to ' + (langNames[lang] || lang);
+  if (lang === 'none' && btn) btn.textContent = '→ Process Video';
+  if (sub) sub.textContent = 'Translate video to ' + (langNames[lang] || lang);
 }
 
 window.addEventListener('resize', fitCanvas);
@@ -551,101 +541,102 @@ function onYPos() {
   captionYPct = parseInt(document.getElementById('yPos').value);
   document.getElementById('yposVal').textContent = captionYPct + '%';
   drawOverlay();
+  savePreset();
 }
 
 // Canvas drawing
 selCanvas.addEventListener('mousedown', e => {
   if (!document.getElementById('removeToggle').checked) return;
   const r = selCanvas.getBoundingClientRect();
-  sx = e.clientX-r.left; sy = e.clientY-r.top;
+  sx = e.clientX - r.left; sy = e.clientY - r.top;
   isDrawing = true; captionBox = null;
   document.getElementById('clearBtn').style.display = 'none';
 });
 selCanvas.addEventListener('mousemove', e => {
   if (!isDrawing) return;
   const r = selCanvas.getBoundingClientRect();
-  ctx.clearRect(0,0,selCanvas.width,selCanvas.height);
-  drawBox(sx,sy,e.clientX-r.left-sx,e.clientY-r.top-sy);
+  ctx.clearRect(0, 0, selCanvas.width, selCanvas.height);
+  drawBox(sx, sy, e.clientX - r.left - sx, e.clientY - r.top - sy);
   if (document.getElementById('addToggle').checked) drawCaption();
 });
 selCanvas.addEventListener('mouseup', e => {
   if (!isDrawing) return; isDrawing = false;
   const r = selCanvas.getBoundingClientRect();
-  const w = e.clientX-r.left-sx, h = e.clientY-r.top-sy;
-  if (Math.abs(w)>6 && Math.abs(h)>6) {
-    captionBox = { x:Math.min(sx,sx+w)/selCanvas.width, y:Math.min(sy,sy+h)/selCanvas.height, w:Math.abs(w)/selCanvas.width, h:Math.abs(h)/selCanvas.height };
-    try { const p=JSON.parse(localStorage.getItem('dubshorts_preset')||'{}'); p.captionBox=captionBox; localStorage.setItem('dubshorts_preset',JSON.stringify(p)); } catch(e) {}
+  const w = e.clientX - r.left - sx, h = e.clientY - r.top - sy;
+  if (Math.abs(w) > 6 && Math.abs(h) > 6) {
+    captionBox = { x: Math.min(sx, sx + w) / selCanvas.width, y: Math.min(sy, sy + h) / selCanvas.height, w: Math.abs(w) / selCanvas.width, h: Math.abs(h) / selCanvas.height };
     document.getElementById('clearBtn').style.display = 'block';
+    savePreset();
   }
   drawOverlay();
 });
 selCanvas.addEventListener('touchstart', e => {
   if (!document.getElementById('removeToggle').checked) return;
-  e.preventDefault(); const t=e.touches[0], r=selCanvas.getBoundingClientRect();
-  sx=t.clientX-r.left; sy=t.clientY-r.top; isDrawing=true; captionBox=null;
-}, {passive:false});
+  e.preventDefault(); const t = e.touches[0], r = selCanvas.getBoundingClientRect();
+  sx = t.clientX - r.left; sy = t.clientY - r.top; isDrawing = true; captionBox = null;
+}, { passive: false });
 selCanvas.addEventListener('touchmove', e => {
   if (!isDrawing) return; e.preventDefault();
-  const t=e.touches[0], r=selCanvas.getBoundingClientRect();
-  ctx.clearRect(0,0,selCanvas.width,selCanvas.height);
-  drawBox(sx,sy,t.clientX-r.left-sx,t.clientY-r.top-sy);
+  const t = e.touches[0], r = selCanvas.getBoundingClientRect();
+  ctx.clearRect(0, 0, selCanvas.width, selCanvas.height);
+  drawBox(sx, sy, t.clientX - r.left - sx, t.clientY - r.top - sy);
   if (document.getElementById('addToggle').checked) drawCaption();
-}, {passive:false});
+}, { passive: false });
 selCanvas.addEventListener('touchend', e => {
-  if (!isDrawing) return; e.preventDefault(); isDrawing=false;
-  const t=e.changedTouches[0], r=selCanvas.getBoundingClientRect();
-  const w=t.clientX-r.left-sx, h=t.clientY-r.top-sy;
-  if (Math.abs(w)>6&&Math.abs(h)>6) {
-    captionBox={x:Math.min(sx,sx+w)/selCanvas.width,y:Math.min(sy,sy+h)/selCanvas.height,w:Math.abs(w)/selCanvas.width,h:Math.abs(h)/selCanvas.height};
-    try { const p=JSON.parse(localStorage.getItem('dubshorts_preset')||'{}'); p.captionBox=captionBox; localStorage.setItem('dubshorts_preset',JSON.stringify(p)); } catch(e) {}
-    document.getElementById('clearBtn').style.display='block';
+  if (!isDrawing) return; e.preventDefault(); isDrawing = false;
+  const t = e.changedTouches[0], r = selCanvas.getBoundingClientRect();
+  const w = t.clientX - r.left - sx, h = t.clientY - r.top - sy;
+  if (Math.abs(w) > 6 && Math.abs(h) > 6) {
+    captionBox = { x: Math.min(sx, sx + w) / selCanvas.width, y: Math.min(sy, sy + h) / selCanvas.height, w: Math.abs(w) / selCanvas.width, h: Math.abs(h) / selCanvas.height };
+    document.getElementById('clearBtn').style.display = 'block';
+    savePreset();
   }
   drawOverlay();
-}, {passive:false});
+}, { passive: false });
 
-function drawBox(x,y,w,h) {
+function drawBox(x, y, w, h) {
   ctx.save();
-  ctx.strokeStyle='rgba(245,225,50,0.85)'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
-  ctx.strokeRect(x,y,w,h);
-  ctx.fillStyle='rgba(245,225,50,0.07)'; ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle = 'rgba(245,225,50,0.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+  ctx.strokeRect(x, y, w, h);
+  ctx.fillStyle = 'rgba(245,225,50,0.07)'; ctx.fillRect(x, y, w, h);
   ctx.restore();
 }
 
 function drawCaption() {
-  const W=selCanvas.width, H=selCanvas.height;
-  if (!W||!H) return;
-  const fsp=parseFloat(document.getElementById('fontSize')?.value||4)/100;
-  const fs=Math.max(8,Math.round(H*fsp));
-  const ff=document.getElementById('fontFamily')?.value||'sans-serif';
-  const ts=document.getElementById('textStyle')?.value||'bold';
-  const tc=document.getElementById('textColor')?.value||'#fff';
-  const oc=document.getElementById('outlineColor')?.value||'#000';
-  const ow=parseFloat(document.getElementById('outlineWidth')?.value||15)/100;
-  const tcase=document.getElementById('textCase')?.value||'upper';
-  const hc=document.getElementById('highlightColor')?.value||'#f5e132';
-  const shadow=parseFloat(document.getElementById('shadowSize')?.value||0)/100;
-  const y=(captionYPct/100)*H;
+  const W = selCanvas.width, H = selCanvas.height;
+  if (!W || !H) return;
+  const fsp = parseFloat(document.getElementById('fontSize')?.value || 4) / 100;
+  const fs = Math.max(8, Math.round(H * fsp));
+  const ff = document.getElementById('fontFamily')?.value || 'sans-serif';
+  const ts = document.getElementById('textStyle')?.value || 'bold';
+  const tc = document.getElementById('textColor')?.value || '#fff';
+  const oc = document.getElementById('outlineColor')?.value || '#000';
+  const ow = parseFloat(document.getElementById('outlineWidth')?.value || 15) / 100;
+  const tcase = document.getElementById('textCase')?.value || 'upper';
+  const hc = document.getElementById('highlightColor')?.value || '#f5e132';
+  const shadow = parseFloat(document.getElementById('shadowSize')?.value || 0) / 100;
+  const y = (captionYPct / 100) * H;
 
   ctx.save();
-  ctx.font=`${ts} ${fs}px ${ff}`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font = `${ts} ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
   if (captionMode === 'single') {
-    let txt=tcase==='lower'?'hola mundo':tcase==='normal'?'Hola Mundo':'HOLA MUNDO';
-    if (shadow>0) { ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=shadow*fs; ctx.shadowOffsetY=shadow*fs*0.3; }
-    if(ow>0){ctx.lineWidth=fs*ow;ctx.strokeStyle=oc;ctx.lineJoin='round';ctx.strokeText(txt,W/2,y);}
-    ctx.shadowBlur=0; ctx.shadowOffsetY=0;
-    ctx.fillStyle=tc; ctx.fillText(txt,W/2,y);
+    let txt = tcase === 'lower' ? 'hola mundo' : tcase === 'normal' ? 'Hola Mundo' : 'HOLA MUNDO';
+    if (shadow > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadow * fs; ctx.shadowOffsetY = shadow * fs * 0.3; }
+    if (ow > 0) { ctx.lineWidth = fs * ow; ctx.strokeStyle = oc; ctx.lineJoin = 'round'; ctx.strokeText(txt, W / 2, y); }
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.fillStyle = tc; ctx.fillText(txt, W / 2, y);
   } else {
-    const words = tcase==='upper' ? ['HOLA','MUNDO','AMIGOS'] : tcase==='lower' ? ['hola','mundo','amigos'] : ['Hola','Mundo','Amigos'];
-    let curX = W/2 - words.reduce((a,w)=>a+ctx.measureText(w+' ').width,0)/2;
+    const words = tcase === 'upper' ? ['HOLA', 'MUNDO', 'AMIGOS'] : tcase === 'lower' ? ['hola', 'mundo', 'amigos'] : ['Hola', 'Mundo', 'Amigos'];
+    let curX = W / 2 - words.reduce((a, w) => a + ctx.measureText(w + ' ').width, 0) / 2;
     words.forEach((word, i) => {
-      const ww = ctx.measureText(word+' ').width;
-      const cx = curX + ww/2 - ctx.measureText(' ').width/2;
-      const color = (captionMode==='highlight' && i===1) ? hc : tc;
-      if (shadow>0) { ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=shadow*fs; ctx.shadowOffsetY=shadow*fs*0.3; }
-      if(ow>0){ctx.lineWidth=fs*ow;ctx.strokeStyle=oc;ctx.lineJoin='round';ctx.strokeText(word,cx,y);}
-      ctx.shadowBlur=0; ctx.shadowOffsetY=0;
-      ctx.fillStyle=color; ctx.fillText(word,cx,y);
+      const ww = ctx.measureText(word + ' ').width;
+      const cx = curX + ww / 2 - ctx.measureText(' ').width / 2;
+      const color = (captionMode === 'highlight' && i === 1) ? hc : tc;
+      if (shadow > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadow * fs; ctx.shadowOffsetY = shadow * fs * 0.3; }
+      if (ow > 0) { ctx.lineWidth = fs * ow; ctx.strokeStyle = oc; ctx.lineJoin = 'round'; ctx.strokeText(word, cx, y); }
+      ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      ctx.fillStyle = color; ctx.fillText(word, cx, y);
       curX += ww;
     });
   }
@@ -653,33 +644,17 @@ function drawCaption() {
 }
 
 function drawOverlay() {
-  ctx.clearRect(0,0,selCanvas.width,selCanvas.height);
+  ctx.clearRect(0, 0, selCanvas.width, selCanvas.height);
   if (captionBox && document.getElementById('removeToggle').checked) {
-    drawBox(captionBox.x*selCanvas.width, captionBox.y*selCanvas.height, captionBox.w*selCanvas.width, captionBox.h*selCanvas.height);
+    drawBox(captionBox.x * selCanvas.width, captionBox.y * selCanvas.height, captionBox.w * selCanvas.width, captionBox.h * selCanvas.height);
   }
   if (document.getElementById('addToggle').checked) drawCaption();
 }
 
-function clearBox() { captionBox=null; document.getElementById('clearBtn').style.display='none'; drawOverlay(); }
+function clearBox() { captionBox = null; document.getElementById('clearBtn').style.display = 'none'; drawOverlay(); savePreset(); }
 
 // ── PROGRESS ──────────────────────────────────────────────────────────────────
-const STEP_TIMES = {
-  removal: 30,
-  upload: 15,
-  dubbing: 120,
-  transcription: 20,
-  captions: 60,
-  merge: 10
-};
-
-const STEPS = [
-  { key: 'removal', label: 'Removing captions...' },
-  { key: 'upload', label: 'Uploading video...' },
-  { key: 'dubbing', label: 'Dubbing audio...' },
-  { key: 'transcription', label: 'Transcribing...' },
-  { key: 'captions', label: 'Burning captions...' },
-  { key: 'merge', label: 'Final merge...' },
-];
+const STEP_TIMES = { removal: 30, upload: 15, dubbing: 120, transcription: 20, captions: 60, merge: 10 };
 
 function getEstimatedTotal(hasRemoval, hasCaptions) {
   let total = STEP_TIMES.upload + STEP_TIMES.dubbing + STEP_TIMES.merge;
@@ -694,15 +669,12 @@ function startProg() {
   const hasCaptions = document.getElementById('addToggle').checked;
   const totalSecs = getEstimatedTotal(hasRemoval, hasCaptions);
   progStartTime = Date.now();
-
   document.getElementById('progWrap').style.display = 'block';
   document.getElementById('progFill').style.width = '0%';
   document.getElementById('progPct').textContent = '0%';
-  document.getElementById('progEta').textContent = `Est. ~${Math.ceil(totalSecs/60)} min`;
-
-  let elapsed = 0;
+  document.getElementById('progEta').textContent = `Est. ~${Math.ceil(totalSecs / 60)} min`;
   progInterval = setInterval(() => {
-    elapsed = (Date.now() - progStartTime) / 1000;
+    const elapsed = (Date.now() - progStartTime) / 1000;
     const pct = Math.min(91, (elapsed / totalSecs) * 100);
     document.getElementById('progFill').style.width = pct.toFixed(1) + '%';
     document.getElementById('progPct').textContent = Math.round(pct) + '%';
@@ -716,7 +688,7 @@ function finishProg() {
   document.getElementById('progFill').style.width = '100%';
   document.getElementById('progPct').textContent = '100%';
   document.getElementById('progEta').textContent = 'Complete!';
-  setTimeout(()=>{ document.getElementById('progWrap').style.display='none'; }, 1500);
+  setTimeout(() => { document.getElementById('progWrap').style.display = 'none'; }, 1500);
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -737,83 +709,11 @@ function getStyle() {
   };
 }
 
-function show(id){document.getElementById(id).style.display='block';}
-function hide(id){document.getElementById(id).style.display='none';}
-function soon(e){e.preventDefault();alert('Coming soon!');}
+function show(id) { document.getElementById(id).style.display = 'block'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+function soon(e) { e.preventDefault(); alert('Coming soon!'); }
 
 // ── TRANSLATE ─────────────────────────────────────────────────────────────────
-async function dubSpeakers() {
-  const f = fileInput.files[0]; if (!f) { alert('Please select a video'); return; }
-  document.getElementById('translateBtn').disabled = true;
-  hide('doneBox'); hide('errBox'); hide('speakerBox');
-  startProg();
-
-  const fd = new FormData();
-  fd.append('video', f);
-
-  try {
-    fd.append('language', document.getElementById('langSelect').value);
-    const res = await fetch('/dub-speakers', { method: 'POST', body: fd });
-    const data = await res.json();
-    finishProg();
-    if (data.success) {
-      // Show final video
-      const doneBox = document.getElementById('doneBox');
-      document.getElementById('resultVideo').style.display = 'block';
-      document.getElementById('resultVideo').src = data.videoUrl;
-      document.getElementById('dlBtn').href = data.videoUrl;
-      document.getElementById('dlBtn').download = 'dubbed_video.mp4';
-      document.querySelector('.done-title').textContent = '// DUBBED ✓';
-      show('doneBox');
-      // Show per-speaker clips too
-      renderSpeakers(data.speakers, data.zipUrl);
-    } else {
-      show('errBox');
-      document.getElementById('errMsg').textContent = data.error;
-    }
-  } catch(err) {
-    finishProg();
-    show('errBox');
-    document.getElementById('errMsg').textContent = 'Could not reach the server.';
-  }
-  document.getElementById('translateBtn').disabled = false;
-}
-
-function renderSpeakers(speakers, zipUrl) {
-  const box = document.getElementById('speakerBox');
-  box.innerHTML = '';
-  const title = document.createElement('div');
-  title.className = 'done-title';
-  title.textContent = '// SPEAKER DETECTION DONE ✓';
-  box.appendChild(title);
-
-  for (const [speaker, clips] of Object.entries(speakers)) {
-    const section = document.createElement('div');
-    section.style = 'margin-top:14px;';
-    const h = document.createElement('div');
-    h.style = 'font-weight:700;font-size:13px;margin-bottom:6px;letter-spacing:1px;color:var(--acc);';
-    h.textContent = '🎤 SPEAKER ' + speaker + ' — ' + clips.length + ' clip(s)';
-    section.appendChild(h);
-    clips.forEach((clip, i) => {
-      const wrap = document.createElement('div');
-      wrap.style = 'margin-bottom:10px;background:rgba(255,255,255,0.04);border-radius:8px;padding:8px;';
-      wrap.innerHTML = '<div style="font-size:11px;color:#aaa;margin-bottom:4px;">Clip ' + (i+1) + ' · ' + clip.start + 's · ' + clip.dur + 's — "' + clip.text + '"</div><video controls playsinline style="width:100%;border-radius:6px;" src="' + clip.url + '"></video>';
-      section.appendChild(wrap);
-    });
-    box.appendChild(section);
-  }
-
-  const dl = document.createElement('a');
-  dl.href = zipUrl;
-  dl.download = 'speaker_clips.zip';
-  dl.className = 'dl-btn';
-  dl.style = 'margin-top:12px;display:block;';
-  dl.textContent = '⬇ Download All Clips (ZIP)';
-  box.appendChild(dl);
-
-  show('speakerBox');
-}
-
 async function startTranslation() {
   const f = fileInput.files[0]; if (!f) { alert('Please select a video'); return; }
   document.getElementById('translateBtn').disabled = true;
@@ -825,9 +725,10 @@ async function startTranslation() {
   fd.append('video', f);
   fd.append('provider', selectedProvider);
   fd.append('language', document.getElementById('langSelect').value);
-  if (document.getElementById('removeToggle').checked && captionBox) fd.append('captionBox', JSON.stringify(captionBox));
   fd.append('captionStyle', JSON.stringify(getStyle()));
   fd.append('addCaption', document.getElementById('addToggle').checked ? 'true' : 'false');
+  if (captionBox) fd.append('captionBox', JSON.stringify(captionBox));
+  if (document.getElementById('removeToggle').checked) fd.append('removeCaption', 'true');
 
   try {
     const res = await fetch('/translate', { method: 'POST', body: fd });
@@ -835,20 +736,9 @@ async function startTranslation() {
     finishProg();
     if (data.success) {
       show('doneBox');
-      if (data.multiSpeaker && data.zipUrl) {
-        document.querySelector('.done-title').textContent = '// DONE ✓ Multi-Speaker Clips';
-        document.getElementById('resultVideo').style.display = 'none';
-        document.getElementById('dlBtn').href = data.zipUrl;
-        document.getElementById('dlBtn').textContent = '⬇ Download Dubbed Clips (ZIP)';
-        document.getElementById('dlBtn').download = 'dubbed_clips.zip';
-      } else {
-        document.getElementById('resultVideo').style.display = 'block';
-        document.getElementById('resultVideo').src = data.videoUrl;
-        document.getElementById('dlBtn').href = data.videoUrl;
-        document.getElementById('dlBtn').download = 'dubbed_video.mp4';
-        if (data.cached) document.querySelector('.done-title').textContent = '// DONE ✓ (cached)';
-        else document.querySelector('.done-title').textContent = '// DONE ✓';
-      }
+      document.getElementById('resultVideo').src = data.videoUrl;
+      document.getElementById('dlBtn').href = data.videoUrl;
+      document.querySelector('.done-title').textContent = data.cached ? '// DONE ✓ (cached)' : '// DONE ✓';
     } else {
       show('errBox');
       document.getElementById('errMsg').textContent = data.error;
@@ -862,15 +752,16 @@ async function startTranslation() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-selCanvas.style.pointerEvents = 'none';
-
 function toggleStylePanel() {
   const inner = document.getElementById('styleInner');
   const arrow = document.getElementById('styleArrow');
   const collapsed = inner.style.display === 'none';
   inner.style.display = collapsed ? 'block' : 'none';
   arrow.textContent = collapsed ? '▼' : '▶';
+  savePreset();
 }
+
+selCanvas.style.pointerEvents = 'none';
 loadPreset();
 updateHint();
 updateTranslateBtn();
