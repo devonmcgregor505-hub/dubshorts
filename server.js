@@ -241,29 +241,35 @@ async function dubWithSpeakerSeparation(videoPath, targetLang, speakerSegments, 
     const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
     const lang = langMap[targetLang] || 'es';
     const dubbedClips = [];
+    const clipPaths = []; // track all clips for cleanup after stitch
 
     for (let i = 0; i < speakerSegments.length; i++) {
       const seg = speakerSegments[i];
       const clipPath = path.resolve(`uploads/spk_clip_${timestamp}_${i}.mp4`);
       const dubbedClipPath = path.resolve(`uploads/spk_dub_${timestamp}_${i}.mp4`);
+      clipPaths.push(clipPath);
 
-      // Cut clip
+      // Cut clip - use -ss before -i for faster seeking
       const duration = seg.end - seg.start;
+      console.log(`Cutting segment ${i}: speaker=${seg.speaker} ${seg.start.toFixed(2)}s-${seg.end.toFixed(2)}s (${duration.toFixed(2)}s)`);
+      runFFmpeg(['-y','-ss',String(seg.start),'-i',videoPath,'-t',String(duration),
+        '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-avoid_negative_ts','make_zero',clipPath], 60000);
+
+      if (!fs.existsSync(clipPath) || fs.statSync(clipPath).size < 1000) {
+        console.log(`Segment ${i} cut failed, skipping`);
+        continue;
+      }
+
       if (duration < 0.5) {
-        console.log(`Segment ${i} too short (${duration}s), copying as-is`);
-        runFFmpeg(['-y','-i',videoPath,'-ss',String(seg.start),'-t',String(duration),
-          '-c:v','libx264','-preset','ultrafast','-c:a','aac',clipPath], 60000);
+        console.log(`Segment ${i} too short, using original`);
         dubbedClips.push(clipPath);
         continue;
       }
 
-      runFFmpeg(['-y','-i',videoPath,'-ss',String(seg.start),'-t',String(duration),
-        '-c:v','libx264','-preset','ultrafast','-c:a','aac',clipPath], 60000);
-      console.log(`Segment ${i} cut: speaker=${seg.speaker} ${seg.start}s–${seg.end}s`);
-
-      // Upload clip
+      // Upload clip with unique filename to avoid tmpfiles cache
       const uploadForm = new FormData();
-      uploadForm.append('file', fs.createReadStream(clipPath), { filename: `clip_${i}.mp4`, contentType: 'video/mp4' });
+      const uniqueName = `clip_${timestamp}_${i}_${Date.now()}.mp4`;
+      uploadForm.append('file', fs.createReadStream(clipPath), { filename: uniqueName, contentType: 'video/mp4' });
       const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, {
         headers: uploadForm.getHeaders(), timeout: 60000
       });
@@ -280,11 +286,11 @@ async function dubWithSpeakerSeparation(videoPath, targetLang, speakerSegments, 
           output_lang: lang,
           num_speakers: 1,
           speed: 1.0,
-          file_prefix: `spk_${i}_${lang}_${Date.now()}`,
+          file_prefix: `spk_${i}_${lang}_${timestamp}_${Math.random().toString(36).slice(2)}`,
           base64: false, webhook: null, track_id: null
         }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
 
-        console.log(`Segment ${i} ModelsLab:`, dubRes.data.status);
+        console.log(`Segment ${i} ModelsLab status:`, dubRes.data.status);
 
         if (dubRes.data.status === 'success' && dubRes.data.output?.[0]) {
           dubbedUrl = dubRes.data.output[0];
@@ -309,25 +315,37 @@ async function dubWithSpeakerSeparation(videoPath, targetLang, speakerSegments, 
         fs.writeFileSync(dubbedClipPath, dlRes.data);
         console.log(`Segment ${i} dubbed! Size:`, dlRes.data.byteLength);
         dubbedClips.push(dubbedClipPath);
+        clipPaths.push(dubbedClipPath);
       } else {
         console.log(`Segment ${i} dubbing failed, using original clip`);
         dubbedClips.push(clipPath);
       }
-
-      try { fs.unlinkSync(clipPath); } catch(e) {}
     }
 
-    // Stitch all clips together
+    if (dubbedClips.length === 0) {
+      console.log('No clips to stitch');
+      return null;
+    }
+
+    // Stitch all clips - cleanup AFTER stitch completes
     console.log('Stitching', dubbedClips.length, 'clips...');
     const concatList = path.resolve(`uploads/concat_${timestamp}.txt`);
-    fs.writeFileSync(concatList, dubbedClips.map(p => `file '${p}'`).join('\n'));
+    // Use absolute paths in concat file
+    fs.writeFileSync(concatList, dubbedClips.map(p => `file '${path.resolve(p)}'`).join('\n'));
     const stitchedPath = path.resolve(`uploads/stitched_${timestamp}.mp4`);
     runFFmpeg(['-y','-f','concat','-safe','0','-i',concatList,
-      '-c:v','libx264','-preset','ultrafast','-c:a','aac',stitchedPath], 180000);
-    try { fs.unlinkSync(concatList); } catch(e) {}
-    dubbedClips.forEach(p => { try { fs.unlinkSync(p); } catch(e) {} });
+      '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',stitchedPath], 300000);
 
-    console.log('Stitching complete!');
+    // Cleanup AFTER stitch is done
+    try { fs.unlinkSync(concatList); } catch(e) {}
+    clipPaths.forEach(p => { try { if(fs.existsSync(p)) fs.unlinkSync(p); } catch(e) {} });
+
+    if (!fs.existsSync(stitchedPath) || fs.statSync(stitchedPath).size < 1000) {
+      console.log('Stitching failed - output missing or empty');
+      return null;
+    }
+
+    console.log('Stitching complete! Size:', fs.statSync(stitchedPath).size);
     return stitchedPath;
   } catch(e) {
     console.log('dubWithSpeakerSeparation error:', e.message);
