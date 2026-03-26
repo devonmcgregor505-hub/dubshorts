@@ -411,6 +411,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           // First get speaker segments from AssemblyAI
           let speakerSegments = [];
           try {
+            if (!process.env.ASSEMBLYAI_API_KEY || process.env.ASSEMBLYAI_API_KEY === 'your_key_here') throw new Error('ASSEMBLYAI_API_KEY not set');
             console.log('Getting speaker diarization...');
             const diarAudioPath = path.resolve('uploads/diar_'+timestamp+'.mp3');
             runFFmpeg(['-y','-i',cleanVideoPath,'-vn','-ac','1','-ar','16000','-c:a','mp3',diarAudioPath], 60000);
@@ -438,7 +439,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
               }
               if (poll.data.status === 'error') break;
             }
-          } catch(e) { console.log('Diarization failed:', e.message); }
+          } catch(e) { console.log('Diarization failed:', e.message); if(e.response) console.log('Diarization 400 body:', JSON.stringify(e.response.data).slice(0,300)); }
 
           if (speakerSegments.length > 0) {
             // Use speaker-separated dubbing
@@ -454,7 +455,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
             }
           }
 
-          if (speakerSegments.length === 0) {
+          if (speakerSegments.length === 0 && !require('fs').existsSync(dubbedVideoPath)) {
             // Fallback: dub full video
             console.log('Uploading to temp storage for dubbing...');
           const uploadForm = new FormData();
@@ -619,8 +620,8 @@ app.post('/translate', upload.single('video'), async (req, res) => {
         console.log('No translation - merging with original audio...');
         runFFmpeg(['-y','-i',videoForMerge,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
       } else {
-        // Use original video stream + dubbed audio to avoid freeze artifacts from re-encoding
-        runFFmpeg(['-y','-i',videoPath,'-i',dubbedVideoPath,'-map','0:v','-map','1:a','-c:v','copy','-c:a','aac','-shortest',outputPath], 180000);
+        // Use videoForMerge (may have captions burned) with dubbed audio
+        runFFmpeg(['-y','-i',videoForMerge,'-i',dubbedVideoPath,'-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',outputPath], 180000);
       }
       const outSize = fs.existsSync(outputPath) ? fs.statSync(outputPath).size : 0;
       console.log('Done! Output size:', outSize, 'bytes');
