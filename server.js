@@ -28,11 +28,7 @@ async function uploadToR2(filePath, key) {
     Body: fileBuffer,
     ContentType: 'video/mp4',
   }));
-  // Generate a signed URL valid for 1 hour
-  const url = await getSignedUrl(r2, new GetObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME,
-    Key: key,
-  }), { expiresIn: 3600 });
+  const url = `https://pub-c068534d6a23426592ffab06501be7a4.r2.dev/${key}`;
   console.log('Uploaded to R2:', key);
   return url;
 }
@@ -379,7 +375,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
             const diarJob = await axios.post('https://api.assemblyai.com/v2/transcript', {
               audio_url: diarUpload.data.upload_url,
               speaker_labels: true,
-              speech_model: 'universal-2'
+              speech_models: ['universal-2']
             }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
             console.log('Diarization job submitted:', diarJob.data.id);
             for (let i = 0; i < 30; i++) {
@@ -461,7 +457,6 @@ app.post('/translate', upload.single('video'), async (req, res) => {
             console.log('Dubbing failed or timed out - using original audio');
             fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
           }
-          } // end single speaker fallback
         } catch(e) {
           console.log('Dubbing error:', e.message);
           fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
@@ -499,7 +494,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
 
           const transcriptRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
             audio_url: uploadRes.data.upload_url,
-            speech_model: 'universal-2',
+            speech_models: ['universal-2'],
           }, {
             headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY },
             timeout: 30000
@@ -650,7 +645,7 @@ app.post('/test-speakers', upload.single('video'), async (req, res) => {
     const jobRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
       audio_url: uploadRes.data.upload_url,
       speaker_labels: true,
-      speech_model: 'universal-2'
+      speech_models: ['universal-2']
     }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
 
     const jobId = jobRes.data.id;
@@ -735,13 +730,213 @@ app.post('/test-speakers', upload.single('video'), async (req, res) => {
     res.json({ success: true, speakers, zipUrl: '/outputs/speaker_test_'+timestamp+'.zip' });
   } catch(err) {
     console.error('test-speakers error:', err.message);
+    if (err.response) console.error('API response:', JSON.stringify(err.response.data).slice(0,500));
     try { fs.unlinkSync(videoPath); } catch(e) {}
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 
+
+app.post('/dub-speakers', upload.single('video'), async (req, res) => {
+  const videoPath = path.resolve(req.file.path);
+  const timestamp = Date.now();
+  const targetLang = req.body.language || 'es';
+  const langMap = { es: 'es', hi: 'hi', pt: 'pt', ja: 'ja', fr: 'fr', pl: 'pl' };
+  const lang = langMap[targetLang] || 'es';
+  const clipsDir = path.resolve('outputs/dubclips_'+timestamp);
+  const outputPath = path.resolve('outputs/final_dubbed_'+timestamp+'.mp4');
+  const zipPath = path.resolve('outputs/dubbed_clips_'+timestamp+'.zip');
+
+  try {
+    if (!process.env.ASSEMBLYAI_API_KEY) throw new Error('ASSEMBLYAI_API_KEY not set');
+    if (!process.env.MODELSLAB_API_KEY) throw new Error('MODELSLAB_API_KEY not set');
+    fs.mkdirSync(clipsDir, { recursive: true });
+
+    // Step 1: Extract audio + diarize
+    console.log('Step 1: Extracting audio for diarization...');
+    const audioPath = path.resolve('uploads/diar_'+timestamp+'.mp3');
+    runFFmpeg(['-y','-i',videoPath,'-vn','-ac','1','-ar','16000','-c:a','mp3',audioPath], 60000);
+
+    const audioBuffer = fs.readFileSync(audioPath);
+    const uploadRes = await axios.post('https://api.assemblyai.com/v2/upload', audioBuffer, {
+      headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY, 'content-type': 'application/octet-stream' },
+      timeout: 60000
+    });
+    try { fs.unlinkSync(audioPath); } catch(e) {}
+
+    const jobRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
+      audio_url: uploadRes.data.upload_url,
+      speaker_labels: true,
+      speech_models: ['universal-2']
+    }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
+
+    const jobId = jobRes.data.id;
+    console.log('Diarization job:', jobId);
+
+    let utterances = [];
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const poll = await axios.get('https://api.assemblyai.com/v2/transcript/'+jobId, {
+        headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 15000
+      });
+      console.log('Poll', i+1, ':', poll.data.status);
+      if (poll.data.status === 'completed') { utterances = poll.data.utterances || []; break; }
+      if (poll.data.status === 'error') throw new Error('AssemblyAI error: ' + poll.data.error);
+    }
+    if (utterances.length === 0) throw new Error('No speaker segments detected');
+    console.log('Got', utterances.length, 'utterances');
+
+    // Step 2: Cut clips per utterance
+    console.log('Step 2: Cutting clips...');
+    const clipList = []; // { path, speaker, start, dur, text, order }
+
+    for (let i = 0; i < utterances.length; i++) {
+      const u = utterances[i];
+      const start = u.start / 1000;
+      const dur = (u.end - u.start) / 1000;
+      if (dur < 0.3) continue;
+      const clipName = 'clip_'+String(i).padStart(3,'0')+'_speaker_'+u.speaker+'.mp4';
+      const clipPath = path.resolve(clipsDir, clipName);
+      console.log('Cutting clip '+i+': Speaker '+u.speaker+' ['+start.toFixed(1)+'s, '+dur.toFixed(1)+'s]');
+      try {
+        runFFmpeg(['-y','-ss',String(start),'-i',videoPath,'-t',String(dur),
+          '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
+          '-avoid_negative_ts','make_zero',clipPath], 60000);
+        if (fs.existsSync(clipPath) && fs.statSync(clipPath).size > 1000) {
+          clipList.push({ path: clipPath, name: clipName, speaker: u.speaker, start, dur, text: u.text, order: i });
+          console.log('  Clip OK');
+        }
+      } catch(e) { console.log('  Clip failed:', e.message); }
+    }
+
+    if (clipList.length === 0) throw new Error('No clips were cut');
+
+    // Step 3: Dub each clip via ModelsLab
+    console.log('Step 3: Dubbing '+clipList.length+' clips via ModelsLab...');
+    const dubbedClips = [];
+
+    for (let i = 0; i < clipList.length; i++) {
+      const clip = clipList[i];
+      console.log('Dubbing clip '+( i+1)+'/'+clipList.length+': Speaker '+clip.speaker);
+      try {
+        // Upload to Cloudflare R2
+        const r2Key = 'clips/'+timestamp+'_'+clip.name;
+        const videoUrl = await uploadToR2(clip.path, r2Key);
+        console.log('  Uploaded to R2:', videoUrl);
+
+        // Dub via ModelsLab
+        const dubRes = await axios.post('https://modelslab.com/api/v6/voice/create_dubbing', {
+          key: process.env.MODELSLAB_API_KEY,
+          init_video: videoUrl,
+          source_lang: 'en',
+          output_lang: lang,
+          num_speakers: 0,
+          speed: 1.0,
+          file_prefix: 'dub_'+lang+'_'+Date.now()+'_'+Math.random().toString(36).slice(2),
+          base64: false, webhook: null, track_id: null
+        }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
+
+        console.log('  ModelsLab response:', JSON.stringify(dubRes.data).slice(0,150));
+
+        let dubbedUrl = null;
+        if (dubRes.data.status === 'success' && dubRes.data.output?.[0]) {
+          dubbedUrl = dubRes.data.output[0];
+        } else if (dubRes.data.status === 'processing' && dubRes.data.fetch_result) {
+          for (let p = 0; p < 60; p++) {
+            await new Promise(r => setTimeout(r, 5000));
+            const poll = await axios.post(dubRes.data.fetch_result, { key: process.env.MODELSLAB_API_KEY }, {
+              headers: { 'Content-Type': 'application/json' }, timeout: 30000
+            });
+            console.log('  Poll '+(p+1)+': '+poll.data.status);
+            if (poll.data.status === 'success' && poll.data.output?.[0]) { dubbedUrl = poll.data.output[0]; break; }
+          }
+        }
+
+        if (dubbedUrl) {
+          const dubbedName = 'dubbed_'+clip.name;
+          const dubbedPath = path.resolve(clipsDir, dubbedName);
+          const dlRes = await axios.get(dubbedUrl, { responseType: 'arraybuffer', timeout: 120000 });
+          fs.writeFileSync(dubbedPath, dlRes.data);
+          console.log('  Dubbed OK:', dubbedPath);
+          dubbedClips.push({ ...clip, dubbedPath, dubbedName });
+        } else {
+          console.log('  Dubbing timed out, using original clip');
+          dubbedClips.push({ ...clip, dubbedPath: clip.path, dubbedName: clip.name });
+        }
+      } catch(e) {
+        console.log('  Clip dub error:', e.message);
+        dubbedClips.push({ ...clip, dubbedPath: clip.path, dubbedName: clip.name });
+      }
+    }
+
+    // Step 4: Stitch dubbed clips in order
+    console.log('Step 4: Stitching dubbed clips...');
+    const concatFile = path.resolve(clipsDir, 'concat.txt');
+    fs.writeFileSync(concatFile, dubbedClips.map(c => "file '" + c.dubbedPath + "'").join('\n'));
+    const stitchedPath = path.resolve(clipsDir, 'stitched.mp4');
+    runFFmpeg(['-y','-f','concat','-safe','0','-i',concatFile,
+      '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
+      stitchedPath], 300000);
+    console.log('Stitched OK');
+
+    // Step 5: Merge dubbed audio over original muted video
+    console.log('Step 5: Merging dubbed audio over original video...');
+    runFFmpeg(['-y','-i',videoPath,'-i',stitchedPath,
+      '-map','0:v','-map','1:a',
+      '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',
+      outputPath], 180000);
+    console.log('Final merge done! Size:', fs.statSync(outputPath).size, 'bytes');
+
+    // Zip all dubbed clips
+    const archiver = require('archiver');
+    const zipOut = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    await new Promise((resolve, reject) => {
+      zipOut.on('close', resolve);
+      archive.on('error', reject);
+      archive.pipe(zipOut);
+      dubbedClips.forEach(c => archive.file(c.dubbedPath, { name: c.dubbedName }));
+      archive.finalize();
+    });
+
+    // Build speaker map for frontend
+    const speakerMap = {};
+    dubbedClips.forEach(c => {
+      if (!speakerMap[c.speaker]) speakerMap[c.speaker] = [];
+      speakerMap[c.speaker].push({
+        url: '/outputs/dubclips_'+timestamp+'/'+c.dubbedName,
+        text: c.text, start: c.start.toFixed(1), dur: c.dur.toFixed(1)
+      });
+    });
+
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+    setTimeout(() => {
+      try { fs.rmSync(clipsDir, { recursive: true, force: true }); } catch(e) {}
+      try { fs.unlinkSync(outputPath); } catch(e) {}
+      try { fs.unlinkSync(zipPath); } catch(e) {}
+    }, 600000);
+
+    res.json({
+      success: true,
+      videoUrl: '/outputs/final_dubbed_'+timestamp+'.mp4',
+      zipUrl: '/outputs/dubbed_clips_'+timestamp+'.zip',
+      speakers: speakerMap
+    });
+
+  } catch(err) {
+    console.error('dub-speakers error:', err.message);
+    if (err.response) console.error('API response:', JSON.stringify(err.response.data).slice(0,500));
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.listen(PORT, ()=>{ console.log('DubShorts running at http://localhost:'+PORT); });
+process.on('uncaughtException', (err) => {
+  if (err.code === 'EPIPE') return;
+  console.error('Uncaught exception:', err.message);
+});
 
 // TEMP: serve last audio for debugging
 app.get('/test-audio', (req, res) => {
@@ -751,3 +946,6 @@ app.get('/test-audio', (req, res) => {
   res.setHeader('Content-Type', 'audio/mpeg');
   require('fs').createReadStream('uploads/' + latest).pipe(res);
 });
+
+app.listen(PORT, () => { console.log('DubShorts running at http://localhost:' + PORT); });
+

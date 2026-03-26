@@ -1,0 +1,8 @@
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774512077035/dubbed_clip_000_speaker_A.mp4'
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774512077035/dubbed_clip_001_speaker_B.mp4'
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774512077035/dubbed_clip_002_speaker_C.mp4'
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774512077035/clip_003_speaker_B.mp4'
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774512077035/dubbed_clip_004_speaker_D.mp4'
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774512077035/dubbed_clip_005_speaker_C.mp4'
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774512077035/dubbed_clip_006_speaker_D.mp4'
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774512077035/clip_007_speaker_C.mp4'

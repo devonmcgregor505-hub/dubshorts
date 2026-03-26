@@ -1,0 +1,4 @@
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774515202209/dubbed_clip_000_speaker_A.mp4'
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774515202209/dubbed_clip_001_speaker_B.mp4'
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774515202209/dubbed_clip_002_speaker_C.mp4'
+file '/Users/kanemcgregor/dubshorts/outputs/dubclips_1774515202209/dubbed_clip_003_speaker_D.mp4'
