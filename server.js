@@ -367,6 +367,389 @@ app.post('/translate', upload.single('video'), async (req, res) => {
           videoUrl = await uploadToR2(cleanVideoPath, r2Key);
           console.log('R2 URL:', videoUrl);
         }
+        // Dub audio via ModelsLab, then replace audio on original video
+        console.log('Dubbing with ModelsLab...');
+        const videoData = await dubWithModelsLab(videoUrl, targetLang);
+        const dubbedAudioOnlyPath = path.resolve('uploads/dubbed_audio_only_'+timestamp+'.mp4');
+        fs.writeFileSync(dubbedAudioOnlyPath, videoData);
+
+        // Extract just the dubbed audio and put it over the original clean video
+        const dubbedAudioPath = path.resolve('uploads/dubbed_audio_'+timestamp+'.aac');
+        runFFmpeg(['-y','-i',dubbedAudioOnlyPath,'-vn','-c:a','aac',dubbedAudioPath], 60000);
+        runFFmpeg(['-y','-i',cleanVideoPath,'-i',dubbedAudioPath,
+          '-map','0:v','-map','1:a',
+          '-c:v','copy','-c:a','aac','-shortest',
+          dubbedVideoPath], 120000);
+        try { fs.unlinkSync(dubbedAudioOnlyPath); } catch(e) {}
+        try { fs.unlinkSync(dubbedAudioPath); } catch(e) {}
+        console.log('ModelsLab dubbing complete!');e('express');
+const multer = require('multer');
+const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+const cors = require('cors');
+const path = require('path');
+const crypto = require('crypto');
+const { spawnSync } = require('child_process');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
+const r2 = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+});
+
+async function uploadToR2(filePath, key) {
+  const fileBuffer = fs.readFileSync(filePath);
+  await r2.send(new PutObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME,
+    Key: key,
+    Body: fileBuffer,
+    ContentType: 'video/mp4',
+  }));
+  // Generate a signed URL valid for 1 hour
+  const url = await getSignedUrl(r2, new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME,
+    Key: key,
+  }), { expiresIn: 3600 });
+  console.log('Uploaded to R2:', key);
+  return url;
+}
+const ffmpegStatic = require('ffmpeg-static');
+const { createCanvas, loadImage, registerFont } = require('canvas');
+
+const fontPath = path.join(__dirname, 'DejaVuSans-Bold.ttf');
+if (fs.existsSync(fontPath)) {
+  registerFont(fontPath, { family: 'CaptionFont', weight: 'bold' });
+  console.log('Font registered:', fontPath);
+}
+
+let FFMPEG_PATH = ffmpegStatic;
+try {
+  const r = spawnSync('which', ['ffmpeg'], { encoding: 'utf8' });
+  if (r.stdout && r.stdout.trim()) { FFMPEG_PATH = r.stdout.trim(); console.log('Using system ffmpeg:', FFMPEG_PATH); }
+  else console.log('Using ffmpeg-static:', FFMPEG_PATH);
+} catch(e) { console.log('Using ffmpeg-static:', FFMPEG_PATH); }
+
+function runFFmpeg(args, timeout = 180000) {
+  const result = spawnSync(FFMPEG_PATH, args, { timeout, maxBuffer: 100 * 1024 * 1024 });
+  if (result.status !== 0) throw new Error('FFmpeg failed: ' + (result.stderr || result.stdout || Buffer.from('')).toString().slice(-400));
+}
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.use(cors());
+app.use(express.json());
+app.use('/outputs', express.static('outputs'));
+const upload = multer({ dest: 'uploads/', limits: { fileSize: 200 * 1024 * 1024 } });
+if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
+if (!fs.existsSync('cache')) fs.mkdirSync('cache');
+
+app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
+app.get('/clear-cache', (req, res) => {
+  try {
+    const files = fs.readdirSync('cache');
+    files.forEach(f => fs.unlinkSync(path.join('cache', f)));
+    res.send('Cache cleared: ' + files.length + ' files deleted');
+  } catch(e) { res.send('Cache clear error: ' + e.message); }
+});
+
+// ── QUEUE ─────────────────────────────────────────────────────────────────────
+const queue = [];
+let activeJobs = 0;
+const MAX_CONCURRENT = 8;
+
+function enqueue(job) {
+  return new Promise((resolve, reject) => {
+    queue.push({ job, resolve, reject });
+    processQueue();
+  });
+}
+
+async function processQueue() {
+  if (activeJobs >= MAX_CONCURRENT || queue.length === 0) return;
+  activeJobs++;
+  const { job, resolve, reject } = queue.shift();
+  try { resolve(await job()); } catch(e) { reject(e); } finally { activeJobs--; processQueue(); }
+}
+
+// ── CACHE ─────────────────────────────────────────────────────────────────────
+function getCacheKey(fileBuffer, lang, provider) {
+  return crypto.createHash('md5').update(fileBuffer).update(lang).update(provider).digest('hex');
+}
+function getCachedResult(key) {
+  const p = path.join('cache', key + '.mp4');
+  return fs.existsSync(p) ? p : null;
+}
+function setCachedResult(key, outputPath) {
+  try { fs.copyFileSync(outputPath, path.join('cache', key + '.mp4')); } catch(e) {}
+}
+
+// ── CAPTIONS ──────────────────────────────────────────────────────────────────
+async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
+  style = style || {};
+  const yPct = (style.yPct !== undefined ? style.yPct : 75) / 100;
+  const fontSizePct = (style.fontSize || 5) / 100;
+  const fontSize = Math.max(10, Math.round(vidH * fontSizePct));
+  const fontFamily = style.fontFamily || (fs.existsSync(fontPath) ? 'CaptionFont' : 'sans-serif');
+  const textStyle = style.textStyle || 'bold';
+  const textColor = style.textColor || '#ffffff';
+  const outlineColor = style.outlineColor || '#000000';
+  const outlineWidthPct = (style.outlineWidth || 15) / 100;
+  const textCase = style.textCase || 'upper';
+  const shadowSize = style.shadowSize || 0;
+  const captionMode = style.captionMode || 'single';
+  const highlightColor = style.highlightColor || '#f5e132';
+
+  const frames = fs.readdirSync(framesDir).filter(f => f.endsWith('.jpg')).sort();
+  console.log(`Burning captions: ${frames.length} frames, ${fontSize}px, y=${Math.round(yPct*100)}%`);
+
+  function getChunkAtTime(t) {
+    if (captionMode === 'single') {
+      const cue = cues.find(c => t >= c.start && t < c.end);
+      return cue ? { words: [{ text: cue.text, highlight: true }] } : null;
+    }
+    const idx = cues.findIndex(c => t >= c.start && t < c.end);
+    if (idx < 0) return null;
+    return buildChunk(idx, vidW, fontSize, fontFamily, textStyle);
+  }
+
+  function buildChunk(activeIdx) {
+    // Find the line that contains the active word (15 char max per line)
+    // Build lines greedily from the start of the transcript
+    const lines = [];
+    let i = 0;
+    let activeLine = 0;
+    while (i < cues.length) {
+      const line = [];
+      let charCount = 0;
+      while (i < cues.length) {
+        const word = cues[i];
+        const wordLen = word.text.length;
+        if (line.length > 0 && charCount + 1 + wordLen > 15) break;
+        line.push({ text: word.text, highlight: i === activeIdx, start: word.start, end: word.end });
+        charCount += (line.length === 1 ? 0 : 1) + wordLen;
+        if (i === activeIdx) activeLine = lines.length;
+        i++;
+      }
+      lines.push(line);
+    }
+    // Return only the line containing the active word
+    return { words: lines[activeLine] || [] };
+  }
+
+  for (let i = 0; i < frames.length; i++) {
+    const t = i / fps;
+    const chunk = getChunkAtTime(t);
+    if (!chunk) continue;
+
+    const framePath = path.join(framesDir, frames[i]);
+    const img = await loadImage(framePath);
+    const canvas = createCanvas(vidW, vidH);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, vidW, vidH);
+
+    const x = vidW / 2;
+    const y = yPct * vidH;
+    ctx.font = `${textStyle} ${fontSize}px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    if (captionMode === 'single') {
+      let txt = chunk.words[0].text;
+      if (textCase === 'upper') txt = txt.toUpperCase();
+      else if (textCase === 'lower') txt = txt.toLowerCase();
+      if (shadowSize > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadowSize * fontSize; ctx.shadowOffsetY = shadowSize * fontSize * 0.3; }
+      if (outlineWidthPct > 0) { ctx.lineWidth = fontSize * outlineWidthPct; ctx.strokeStyle = outlineColor; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); }
+      ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      ctx.fillStyle = textColor; ctx.fillText(txt, x, y);
+    } else {
+      const words = chunk.words.map(w => {
+        let txt = w.text;
+        if (textCase === 'upper') txt = txt.toUpperCase();
+        else if (textCase === 'lower') txt = txt.toLowerCase();
+        return { ...w, txt };
+      });
+      const wordWidths = words.map(w => ctx.measureText(w.txt + ' ').width);
+      const lines = [];
+      let currentLine = [], currentW = 0;
+      words.forEach((w, i) => {
+        if (currentW + wordWidths[i] > vidW * 0.85 && currentLine.length > 0) {
+          lines.push(currentLine); currentLine = [w]; currentW = wordWidths[i];
+        } else { currentLine.push(w); currentW += wordWidths[i]; }
+      });
+      if (currentLine.length) lines.push(currentLine);
+      const lineH = fontSize * 1.3;
+      const startY = y - ((lines.length - 1) * lineH) / 2;
+      lines.forEach((line, li) => {
+        const lineW = line.reduce((acc, w, i) => acc + ctx.measureText(w.txt + ' ').width, 0);
+        let curX = vidW / 2 - lineW / 2;
+        const lineY = startY + li * lineH;
+        line.forEach(w => {
+          const ww = ctx.measureText(w.txt + ' ').width;
+          const cx = curX + ww / 2 - ctx.measureText(' ').width / 2;
+          const color = (captionMode === 'highlight' && w.highlight) ? highlightColor : textColor;
+          if (shadowSize > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadowSize * fontSize; ctx.shadowOffsetY = shadowSize * fontSize * 0.3; }
+          if (outlineWidthPct > 0) { ctx.lineWidth = fontSize * outlineWidthPct; ctx.strokeStyle = outlineColor; ctx.lineJoin = 'round'; ctx.strokeText(w.txt, cx, lineY); }
+          ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+          ctx.fillStyle = color; ctx.fillText(w.txt, cx, lineY);
+          curX += ww;
+        });
+      });
+    }
+    fs.writeFileSync(framePath, canvas.toBuffer('image/jpeg', { quality: 0.92 }));
+    canvas.width = 0; canvas.height = 0;
+    if (i % 30 === 0) { console.log(`Captioned ${i}/${frames.length}`); await new Promise(r => setTimeout(r, 1)); }
+  }
+  console.log('All frames captioned!');
+}
+
+
+
+// ── MODELSLAB ─────────────────────────────────────────────────────────────────
+async function dubWithModelsLab(videoUrl, targetLang, sourceLang='en') {
+  const langMap = {
+    es: 'es', hi: 'hi', pt: 'pt-br', ja: 'ja', fr: 'fr', pl: 'pl',
+    it: 'it', zh: 'zh', 'en-us': 'en-us', 'en-gb': 'en-gb', en: 'en-us'
+  };
+  const lang = langMap[targetLang] || targetLang;
+
+  const dubRes = await axios.post('https://modelslab.com/api/v6/voice/create_dubbing', {
+    key: process.env.MODELSLAB_API_KEY,
+    init_video: videoUrl,
+    source_lang: sourceLang,
+    output_lang: lang,
+    speed: 1.0,
+    num_speakers: 0,
+    file_prefix: 'dub_'+lang+'_'+Date.now()+'_'+Math.random().toString(36).slice(2),
+    base64: false, webhook: null, track_id: null
+  }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
+
+  console.log('ModelsLab response:', JSON.stringify(dubRes.data).slice(0, 300));
+
+  if (dubRes.data.status === 'success' && dubRes.data.output?.[0]) {
+    const dlRes = await axios.get(dubRes.data.output[0], { responseType: 'arraybuffer', timeout: 120000 });
+    return dlRes.data;
+  }
+
+  if (dubRes.data.status === 'processing' && dubRes.data.fetch_result) {
+    for (let attempts = 0; attempts < 180; attempts++) {
+      await new Promise(r => setTimeout(r, 5000));
+      const poll = await axios.post(dubRes.data.fetch_result, { key: process.env.MODELSLAB_API_KEY }, {
+        headers: { 'Content-Type': 'application/json' }, timeout: 30000
+      });
+      console.log(`Poll ${attempts+1}: ${poll.data.status}`);
+      if (poll.data.status === 'success' && poll.data.output?.[0]) {
+        const dlRes = await axios.get(poll.data.output[0], { responseType: 'arraybuffer', timeout: 120000 });
+        return dlRes.data;
+      }
+      if (poll.data.status === 'failed') {
+        throw new Error('ModelsLab dubbing failed: ' + JSON.stringify(poll.data).slice(0, 200));
+      }
+    }
+  }
+  throw new Error('ModelsLab dubbing failed or timed out: ' + JSON.stringify(dubRes.data).slice(0, 200));
+}
+
+// ── MAIN ROUTE ────────────────────────────────────────────────────────────────
+app.post('/translate', upload.single('video'), async (req, res) => {
+  const videoPath = path.resolve(req.file.path);
+  const timestamp = Date.now();
+  // audioPath = dubbed audio (mp3 for elevenlabs, mp4 for modelslab)
+  const audioPath = path.resolve('uploads/dubbed_audio_'+timestamp+'.mp3');
+  // videoWithAudioPath = for modelslab this is the full dubbed video mp4
+  const dubbedVideoPath = path.resolve('uploads/dubbed_video_'+timestamp+'.mp4');
+  const framesDir = path.resolve('uploads/frames_'+timestamp);
+  const captionedPath = path.resolve('uploads/captioned_'+timestamp+'.mp4');
+  const outputPath = path.resolve('outputs/final_'+timestamp+'.mp4');
+  const allFiles = [videoPath, audioPath, dubbedVideoPath, captionedPath, path.resolve('uploads/raw_inpaint_'+timestamp+'.mp4')];
+
+  console.log('File received:', req.file.originalname);
+
+  let captionBox = null;
+  if (req.body.captionBox) { try { captionBox = JSON.parse(req.body.captionBox); } catch(e) {} }
+  let captionStyle = null;
+  if (req.body.captionStyle) { try { captionStyle = JSON.parse(req.body.captionStyle); } catch(e) {} }
+  const provider = req.body.provider || 'modelslab';
+  const targetLang = req.body.language || 'es';
+
+  // Cache check
+  const fileBuffer = fs.readFileSync(videoPath);
+  const cacheKey = getCacheKey(fileBuffer, targetLang, provider);
+  const cached = getCachedResult(cacheKey);
+  if (cached) {
+    console.log('Cache hit!');
+    const cachedOut = path.resolve('outputs/final_'+timestamp+'.mp4');
+    fs.copyFileSync(cached, cachedOut);
+    setTimeout(()=>{ try { if(fs.existsSync(cachedOut)) fs.unlinkSync(cachedOut); } catch(e){} }, 600000);
+    return res.json({ success: true, videoUrl: '/outputs/final_'+timestamp+'.mp4', cached: true });
+  }
+
+  try {
+    const result = await enqueue(async () => {
+      let vidW=1080, vidH=1920, fps=24;
+      try {
+        const probe = spawnSync(FFMPEG_PATH, ['-i', videoPath], { encoding: 'utf8' });
+        const dim = (probe.stderr||'').match(/(\d{3,4})x(\d{3,4})/);
+        const fpsM = (probe.stderr||'').match(/(\d+(?:\.\d+)?) fps/);
+        if (dim) { vidW=parseInt(dim[1]); vidH=parseInt(dim[2]); }
+        if (fpsM) fps=Math.min(parseFloat(fpsM[1]), 24);
+        const durCheck = (probe.stderr||'').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
+        if (durCheck) {
+          const durSecs = parseInt(durCheck[1])*3600+parseInt(durCheck[2])*60+parseFloat(durCheck[3]);
+          if (durSecs > 120) throw new Error('Video must be under 2 minutes');
+        }
+        console.log('Video:', vidW, 'x', vidH, '@', fps, 'fps');
+      } catch(e) { if (e.message.includes('under 2 minutes')) throw e; }
+
+      // Caption removal
+      let cleanVideoPath = videoPath;
+      if (captionBox) {
+        console.log('OpenCV caption removal...');
+        const { x, y, w, h } = captionBox;
+        const cleanPath = path.resolve('uploads/clean_'+timestamp+'.mp4');
+        const rawInpaintPath = path.resolve('uploads/raw_inpaint_'+timestamp+'.mp4');
+        const inpaintResult = spawnSync('python3', [
+          path.join(__dirname, 'inpaint.py'),
+          videoPath, rawInpaintPath,
+          String(x), String(y), String(w), String(h)
+        ], { encoding: 'utf8', timeout: 1200000, maxBuffer: 100*1024*1024 });
+        console.log('Inpaint stdout:', inpaintResult.stdout?.slice(-300) || 'EMPTY');
+        if (inpaintResult.status !== 0 || !fs.existsSync(rawInpaintPath)) {
+          console.log('Inpaint failed, using original');
+        } else {
+          runFFmpeg(['-y','-i',rawInpaintPath,'-i',videoPath,'-map','0:v','-map','1:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-shortest',cleanPath], 120000);
+          try { fs.unlinkSync(rawInpaintPath); } catch(e) {}
+          cleanVideoPath = cleanPath;
+          console.log('Caption removal done!');
+        }
+      }
+
+      // Dub
+      if (targetLang === 'none') {
+        console.log('No translation selected');
+        fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
+      } else {
+        const fileSize = fs.statSync(cleanVideoPath).size;
+        let videoUrl;
+        if (fileSize < 50 * 1024 * 1024) {
+          console.log('File under 50MB, uploading to tmpfiles...');
+          const uploadForm = new FormData();
+          uploadForm.append('file', fs.createReadStream(cleanVideoPath), { filename: req.file.originalname, contentType: req.file.mimetype });
+          const tmpRes = await axios.post('https://tmpfiles.org/api/v1/upload', uploadForm, { headers: uploadForm.getHeaders() });
+          videoUrl = tmpRes.data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+          console.log('tmpfiles URL:', videoUrl);
+        } else {
+          console.log('File over 50MB, uploading to R2...');
+          const r2Key = 'uploads/dub_input_' + Date.now() + '.mp4';
+          videoUrl = await uploadToR2(cleanVideoPath, r2Key);
+          console.log('R2 URL:', videoUrl);
+        }
         // ── MULTI-SPEAKER DUBBING ─────────────────────────────────────────
         console.log('Running AssemblyAI diarization...');
         const diarAudioPath = path.resolve('uploads/diar_audio_'+timestamp+'.mp3');
