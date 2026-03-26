@@ -315,8 +315,7 @@ app.post('/translate', upload.single('video'), async (req, res) => {
             try { fs.unlinkSync(diarAudioPath); } catch(e) {}
             const diarJob = await axios.post('https://api.assemblyai.com/v2/transcript', {
               audio_url: diarUpload.data.upload_url,
-              speaker_labels: true,
-              word_boost: []
+              speaker_labels: true
             }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
             for (let i = 0; i < 30; i++) {
               await new Promise(r => setTimeout(r, 3000));
