@@ -385,6 +385,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
 <script>
 const fileInput = document.getElementById('fileInput');
+document.getElementById('uploadZone').addEventListener('click', () => fileInput.click());
 const selCanvas = document.getElementById('selCanvas');
 const ctx = selCanvas.getContext('2d');
 const previewVideo = document.getElementById('previewVideo');
