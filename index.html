@@ -23,7 +23,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--blk);color:var(--tx);disp
 .logo-sub{font-size:8px;color:var(--tmut);margin-top:2px;letter-spacing:2.5px;text-transform:uppercase;}
 .nav{padding:8px 7px;flex:1;overflow-y:auto;}
 .nav-lbl{font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--tmut);padding:0 8px;margin:8px 0 3px;}
-.ni{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:12px;font-weight:500;color:var(--tdim);transition:all .15s;border:1px solid transparent;margin-bottom:1px;text-decoration:none;cursor:pointer;}
+.ni{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:12px;font-weight:500;color:var(--tdim);transition:all .15s;border:1px solid transparent;margin-bottom:1px;text-decoration:none;cursor:pointer;background:none;width:100%;text-align:left;}
 .ni:hover{background:var(--s2);color:var(--tx);}
 .ni.active{background:var(--yg);border-color:rgba(245,225,50,0.18);color:var(--y);}
 .ni .ic{font-size:13px;width:15px;text-align:center;flex-shrink:0;}
@@ -43,6 +43,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--blk);color:var(--tx);disp
 .pg-sep,.pg-sub{font-size:12px;color:var(--tdim);}
 .pill{margin-left:auto;background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.18);color:var(--grn);font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:.8px;}
 
+/* Tab panels */
+.tab-panel{display:none;flex:1;overflow:hidden;}
+.tab-panel.active{display:flex;}
+
 .workspace{flex:1;display:flex;overflow:hidden;}
 .left{width:420px;flex-shrink:0;border-right:1px solid var(--bd);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:11px;}
 
@@ -50,13 +54,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--blk);color:var(--tx);disp
 .upload-zone{border:1.5px dashed var(--bd);border-radius:11px;padding:18px 16px;text-align:center;cursor:pointer;position:relative;transition:all .2s;background:var(--s1);}
 .upload-zone:hover{border-color:var(--yd);background:var(--s2);}
 .upload-zone.has-file{border-color:rgba(245,225,50,.35);border-style:solid;background:rgba(245,225,50,.02);}
-input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-zone.drag{border-color:var(--y);background:var(--yg);}
 .up-icon{font-size:22px;display:block;margin-bottom:5px;}
 .up-title{font-size:13px;font-weight:600;margin-bottom:2px;}
 .up-hint{font-size:11px;color:var(--tmut);}
 .up-name{font-size:10px;color:var(--y);font-weight:600;margin-top:4px;word-break:break-all;line-height:1.4;}
 
-/* Language selector */
+/* Lang */
 .lang-row{display:flex;flex-direction:column;gap:5px;}
 .lang-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--tdim);}
 .lang-sel{background:var(--s2);border:1px solid var(--bd);color:var(--tx);padding:9px 11px;border-radius:8px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;width:100%;}
@@ -66,7 +70,6 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 .tog-row{display:flex;gap:8px;}
 .tc{flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:10px 11px;display:flex;align-items:center;gap:8px;transition:all .15s;cursor:pointer;}
 .tc.on{border-color:rgba(245,225,50,.22);background:var(--yg);}
-.tc.active{border:2px solid #f5c518;box-shadow:0 0 10px rgba(245,197,24,0.3);}
 .tc-ic{font-size:13px;flex-shrink:0;}
 .tc-info{flex:1;min-width:0;}
 .tc-title{font-size:12px;font-weight:600;}
@@ -96,28 +99,18 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 .rr{display:flex;align-items:center;gap:5px;}
 .rr input[type=range]{flex:1;accent-color:var(--y);}
 .rv{font-size:9px;color:var(--y);font-weight:700;font-family:'Space Mono',monospace;min-width:28px;text-align:right;}
-
-/* Caption mode buttons */
 .mode-row{display:flex;gap:6px;margin-top:8px;}
 .mode-btn{flex:1;padding:6px 4px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--bd);background:var(--s3);color:var(--tdim);transition:all .15s;text-align:center;}
 .mode-btn.active{background:var(--yg);border-color:rgba(245,225,50,.35);color:var(--y);}
-
-/* Highlight color row */
 .hc-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
 .hc-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--tmut);flex:1;}
 
-/* Save preset */
-.preset-btn{width:100%;padding:10px;background:var(--s3);color:var(--tx);border:1px solid var(--bd);border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;transition:all .2s;}
-.preset-btn:hover{border-color:var(--y);color:var(--y);}
-
-/* Submit */
+/* Buttons */
 .submit{width:100%;padding:12px;background:var(--y);color:var(--blk);border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;transition:all .2s;}
 .submit:hover{background:#ffe600;box-shadow:0 4px 14px rgba(245,225,50,.14);}
 .submit:disabled{background:var(--s4);color:var(--tmut);cursor:not-allowed;box-shadow:none;}
-
-/* Queue indicator */
-.queue-bar{background:var(--s3);border:1px solid var(--bd);border-radius:7px;padding:7px 11px;font-size:10px;color:var(--tdim);display:none;text-align:center;}
-.queue-bar.visible{display:block;}
+.submit.green{background:linear-gradient(135deg,#2ecc71,#27ae60);color:#fff;}
+.submit.green:hover{background:linear-gradient(135deg,#3de07f,#2ecc71);box-shadow:0 4px 14px rgba(46,204,113,.2);}
 
 /* Progress */
 .prog-wrap{display:none;}
@@ -126,7 +119,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 .prog-fill{height:100%;background:linear-gradient(90deg,var(--y),#ffe600);border-radius:4px;width:0%;transition:width .35s ease;}
 .prog-eta{font-size:9px;color:var(--tmut);margin-top:3px;font-family:'Space Mono',monospace;}
 
-/* Done box */
+/* Done */
 .done-box{background:rgba(46,204,113,.04);border:1px solid rgba(46,204,113,.14);border-radius:9px;padding:11px;display:none;}
 .done-title{font-size:10px;font-weight:700;font-family:'Space Mono',monospace;color:var(--grn);margin-bottom:7px;}
 .dl-btn{display:block;width:100%;padding:9px;background:var(--grn);color:#000;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;margin-top:8px;text-align:center;text-decoration:none;transition:all .2s;}
@@ -135,7 +128,11 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 /* Error */
 .err-box{background:rgba(255,65,54,.04);border:1px solid rgba(255,65,54,.14);border-radius:9px;padding:11px;display:none;}
 .err-title{font-size:10px;font-weight:700;font-family:'Space Mono',monospace;color:var(--red);margin-bottom:4px;}
-.errmsg{color:#ff7070;font-size:11px;}
+.errmsg{color:#ff7070;font-size:11px;line-height:1.5;}
+
+/* Info box */
+.info-box{background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px;font-size:11px;color:var(--tdim);line-height:1.8;}
+.info-box b{color:var(--tx);}
 
 /* Right preview */
 .right{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;background:var(--blk);gap:10px;padding:20px;overflow-y:auto;}
@@ -143,33 +140,35 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 .empty-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--tmut);}
 .empty-state span{font-size:30px;}
 .empty-state p{font-size:11px;}
-#previewVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;}
-#selCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+.phone-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;}
+.sel-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
 .hint-bar{width:100%;max-width:315px;background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:7px 10px;display:flex;align-items:center;gap:8px;}
 .hint-txt{font-size:10px;color:var(--tdim);flex:1;line-height:1.4;}
 .clear-btn{padding:3px 8px;border:1px solid var(--bd);background:transparent;color:var(--tdim);border-radius:5px;font-size:10px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;flex-shrink:0;display:none;}
 .clear-btn:hover{border-color:var(--y);color:var(--y);}
+.preview-lbl{font-size:9px;color:var(--tmut);font-family:'Space Mono',monospace;letter-spacing:1px;}
 
-@font-face { font-family: 'Anton'; src: url('/fonts/Anton-Regular.ttf'); }
-@font-face { font-family: 'BebasNeue'; src: url('/fonts/BebasNeue-Regular.ttf'); }
-@font-face { font-family: 'Oswald'; src: url('/fonts/Oswald-Bold.ttf'); font-weight: bold; }
-@font-face { font-family: 'BarlowCondensed'; src: url('/fonts/BarlowCondensed-Bold.ttf'); font-weight: bold; }
-@font-face { font-family: 'FjallaOne'; src: url('/fonts/FjallaOne-Regular.ttf'); }
-@font-face { font-family: 'Roboto'; src: url('/fonts/Roboto-Bold.ttf'); font-weight: bold; }
-@font-face { font-family: 'Poppins'; src: url('/fonts/Poppins-Bold.ttf'); font-weight: bold; }
-@font-face { font-family: 'Lato'; src: url('/fonts/Lato-Bold.ttf'); font-weight: bold; }
-@font-face { font-family: 'Ubuntu'; src: url('/fonts/Ubuntu-Bold.ttf'); font-weight: bold; }
-@font-face { font-family: 'Bangers'; src: url('/fonts/Bangers-Regular.ttf'); }
-@font-face { font-family: 'Pacifico'; src: url('/fonts/Pacifico-Regular.ttf'); }
-@font-face { font-family: 'PermanentMarker'; src: url('/fonts/PermanentMarker-Regular.ttf'); }
-@font-face { font-family: 'Righteous'; src: url('/fonts/Righteous-Regular.ttf'); }
-@font-face { font-family: 'Montserrat'; src: url('/fonts/Montserrat-Bold.ttf'); font-weight: bold; }
-@font-face { font-family: 'CaptionFont'; src: url('/DejaVuSans-Bold.ttf'); font-weight: bold; }
-@font-face { font-family: 'Impact'; src: url('/fonts/Impact.ttf'); font-weight: bold; }
+@font-face{font-family:'Anton';src:url('/fonts/Anton-Regular.ttf');}
+@font-face{font-family:'BebasNeue';src:url('/fonts/BebasNeue-Regular.ttf');}
+@font-face{font-family:'Oswald';src:url('/fonts/Oswald-Bold.ttf');font-weight:bold;}
+@font-face{font-family:'BarlowCondensed';src:url('/fonts/BarlowCondensed-Bold.ttf');font-weight:bold;}
+@font-face{font-family:'FjallaOne';src:url('/fonts/FjallaOne-Regular.ttf');}
+@font-face{font-family:'Roboto';src:url('/fonts/Roboto-Bold.ttf');font-weight:bold;}
+@font-face{font-family:'Poppins';src:url('/fonts/Poppins-Bold.ttf');font-weight:bold;}
+@font-face{font-family:'Lato';src:url('/fonts/Lato-Bold.ttf');font-weight:bold;}
+@font-face{font-family:'Ubuntu';src:url('/fonts/Ubuntu-Bold.ttf');font-weight:bold;}
+@font-face{font-family:'Bangers';src:url('/fonts/Bangers-Regular.ttf');}
+@font-face{font-family:'Pacifico';src:url('/fonts/Pacifico-Regular.ttf');}
+@font-face{font-family:'PermanentMarker';src:url('/fonts/PermanentMarker-Regular.ttf');}
+@font-face{font-family:'Righteous';src:url('/fonts/Righteous-Regular.ttf');}
+@font-face{font-family:'Montserrat';src:url('/fonts/Montserrat-Bold.ttf');font-weight:bold;}
+@font-face{font-family:'CaptionFont';src:url('/DejaVuSans-Bold.ttf');font-weight:bold;}
+@font-face{font-family:'Impact';src:url('/fonts/Impact.ttf');font-weight:bold;}
 </style>
 </head>
 <body>
 
+<!-- ═══ SIDEBAR ═══ -->
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-mark">DubShorts</div>
@@ -177,11 +176,11 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
   </div>
   <nav class="nav">
     <div class="nav-lbl">Tools</div>
-    <a class="ni active" href="#"><span class="ic">🎙</span>Dubbing<span class="badge live">LIVE</span></a>
-    <a class="ni" href="#" onclick="soon(event)"><span class="ic">🔍</span>Scraper<span class="badge soon">SOON</span></a>
-    <a class="ni" href="#" onclick="soon(event)"><span class="ic">💧</span>Watermark Remover<span class="badge soon">SOON</span></a>
-    <a class="ni" href="#" onclick="soon(event)"><span class="ic">✍️</span>Auto Captions<span class="badge soon">SOON</span></a>
-    <a class="ni" href="#" onclick="showRemover()"><span class="ic">✂️</span>Caption Remover<span class="badge live">LIVE</span></a>
+    <button class="ni active" id="nav-dub" onclick="switchTab('dub')"><span class="ic">🎙</span>Dubbing<span class="badge live">LIVE</span></button>
+    <button class="ni" id="nav-remover" onclick="switchTab('remover')"><span class="ic">✂️</span>Caption Remover<span class="badge live">LIVE</span></button>
+    <button class="ni" onclick="soon()"><span class="ic">🔍</span>Scraper<span class="badge soon">SOON</span></button>
+    <button class="ni" onclick="soon()"><span class="ic">💧</span>Watermark Remover<span class="badge soon">SOON</span></button>
+    <button class="ni" onclick="soon()"><span class="ic">✍️</span>Auto Captions<span class="badge soon">SOON</span></button>
   </nav>
   <div class="sf">
     <div class="cb-lbl"><span>Usage</span><b>68%</b></div>
@@ -190,339 +189,402 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
   </div>
 </aside>
 
+<!-- ═══ MAIN ═══ -->
 <div class="main">
   <div class="topbar">
-    <span class="pg-title">Dubbing</span>
+    <span class="pg-title" id="topTitle">Dubbing</span>
     <span class="pg-sep"> / </span>
-    <span class="pg-sub" id="topbarSub">Translate video</span>
+    <span class="pg-sub" id="topSub">Translate video</span>
     <div class="pill">● Live</div>
   </div>
 
-  <div class="workspace">
-    <div class="left">
+  <!-- ══ DUBBING TAB ══ -->
+  <div class="tab-panel active" id="tab-dub">
+    <div class="workspace">
+      <div class="left">
 
-      <!-- Upload -->
-      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click();" style="cursor:pointer;">
-        <input type="file" id="fileInput" accept="video/mp4,video/quicktime,.mp4,.mov" style="display:none;">
-        <span class="up-icon">🎬</span>
-        <div class="up-title">Drop video here</div>
-        <div class="up-hint">MP4 or MOV · Max 200MB</div>
-        <div class="up-name" id="fileName"></div>
-      </div>
-
-      <!-- Language -->
-      <div class="lang-row">
-        <div class="lang-lbl">Select Language</div>
-        <select class="lang-sel" id="langSelect" onchange="onLangChange()">
-          <option value="none">🔇 None (No Translation)</option>
-          <option value="es">🇪🇸 Spanish</option>
-          <option value="hi">🇮🇳 Hindi</option>
-          <option value="pt">🇧🇷 Portuguese</option>
-          <option value="ja">🇯🇵 Japanese</option>
-          <option value="fr">🇫🇷 French</option>
-          <option value="pl">🇵🇱 Polish</option>
-          <option value="it">🇮🇹 Italian</option>
-          <option value="zh">🇨🇳 Chinese</option>
-        </select>
-      </div>
-
-      <!-- Toggles -->
-      <div class="tog-row">
-        <div class="tc" id="removeCard" onclick="document.getElementById('removeToggle').click();">
-          <div class="tc-ic">🗑</div>
-          <div class="tc-info">
-            <div class="tc-title">Remove Captions</div>
-            <div class="tc-desc">Draw box over captions</div>
-          </div>
-          <label class="tog" onclick="event.stopPropagation()">
-            <input type="checkbox" id="removeToggle" onchange="onRemove();savePreset();">
-            <div class="tog-track"></div>
-            <div class="tog-thumb"></div>
-          </label>
+        <!-- Upload -->
+        <div class="upload-zone" id="dubUploadZone">
+          <input type="file" id="dubFileInput" accept="video/mp4,video/quicktime,.mp4,.mov" style="display:none">
+          <span class="up-icon">🎬</span>
+          <div class="up-title">Drop video here</div>
+          <div class="up-hint">MP4 or MOV · Max 200MB</div>
+          <div class="up-name" id="dubFileName"></div>
         </div>
-        <div class="tc" id="addCard" onclick="document.getElementById('addToggle').click();">
-          <div class="tc-ic">💬</div>
-          <div class="tc-info">
-            <div class="tc-title">Add Captions</div>
-            <div class="tc-desc">Translated subtitles</div>
-          </div>
-          <label class="tog" onclick="event.stopPropagation()">
-            <input type="checkbox" id="addToggle" onchange="onAdd();savePreset();">
-            <div class="tog-track"></div>
-            <div class="tog-thumb"></div>
-          </label>
+
+        <!-- Language -->
+        <div class="lang-row">
+          <div class="lang-lbl">Select Language</div>
+          <select class="lang-sel" id="langSelect" onchange="updateTranslateBtn();savePreset();">
+            <option value="none">🔇 None (No Translation)</option>
+            <option value="es">🇪🇸 Spanish</option>
+            <option value="hi">🇮🇳 Hindi</option>
+            <option value="pt">🇧🇷 Portuguese</option>
+            <option value="ja">🇯🇵 Japanese</option>
+            <option value="fr">🇫🇷 French</option>
+            <option value="pl">🇵🇱 Polish</option>
+            <option value="it">🇮🇹 Italian</option>
+            <option value="zh">🇨🇳 Chinese</option>
+          </select>
         </div>
-      </div>
 
-      <!-- Caption Style -->
-      <div class="style-panel" id="stylePanel" style="display:none">
-        <div class="sp-hd" onclick="toggleStylePanel()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">Caption Style <span id="styleArrow">▼</span></div>
-        <div id="styleInner">
-
-          <div class="ypos-row">
-            <div class="ypos-lbl"><span>Vertical Position</span><span id="yposVal">70%</span></div>
-            <input type="range" id="yPos" min="5" max="95" value="70" step="1" style="width:100%;accent-color:var(--y);" oninput="onYPos()">
-            <div class="ypos-marks"><span>Top</span><span>Center</span><span>Bottom</span></div>
-          </div>
-
-          <!-- Caption Mode -->
-          <div class="sfi">
-            <label>Caption Mode</label>
-            <div class="mode-row">
-              <button class="mode-btn active" id="modeSingle" onclick="setMode('single');savePreset();">Single Word</button>
-              <button class="mode-btn" id="modeMulti" onclick="setMode('multi');savePreset();">Multi Word</button>
-              <button class="mode-btn" id="modeHighlight" onclick="setMode('highlight');savePreset();">✨ Highlight</button>
+        <!-- Toggles -->
+        <div class="tog-row">
+          <div class="tc" id="removeCard" onclick="document.getElementById('removeToggle').click();">
+            <div class="tc-ic">🗑</div>
+            <div class="tc-info">
+              <div class="tc-title">Remove Captions</div>
+              <div class="tc-desc">Draw box over captions</div>
             </div>
+            <label class="tog" onclick="event.stopPropagation()">
+              <input type="checkbox" id="removeToggle" onchange="onRemove();savePreset();">
+              <div class="tog-track"></div><div class="tog-thumb"></div>
+            </label>
           </div>
-
-          <!-- Highlight color -->
-          <div class="hc-row" id="hlColorRow" style="display:none">
-            <span class="hc-lbl">Highlight Color</span>
-            <input type="color" id="highlightColor" value="#f5e132" style="width:50px;height:26px;border:1px solid var(--bd);border-radius:5px;background:var(--s3);cursor:pointer;" oninput="drawOverlay();savePreset();">
+          <div class="tc" id="addCard" onclick="document.getElementById('addToggle').click();">
+            <div class="tc-ic">💬</div>
+            <div class="tc-info">
+              <div class="tc-title">Add Captions</div>
+              <div class="tc-desc">Translated subtitles</div>
+            </div>
+            <label class="tog" onclick="event.stopPropagation()">
+              <input type="checkbox" id="addToggle" onchange="onAdd();savePreset();">
+              <div class="tog-track"></div><div class="tog-thumb"></div>
+            </label>
           </div>
+        </div>
 
-          <div class="sg" style="margin-top:10px;">
-            <div class="sfi" style="grid-column:1/-1">
-              <label>Font</label>
-              <div style="position:relative">
-                <input type="text" id="fontSearch" placeholder="Search fonts..." autocomplete="off"
-                  style="width:100%;background:var(--s3);border:1px solid var(--bd);color:var(--tx);padding:5px 7px;border-radius:6px 6px 0 0;font-size:11px;font-family:'DM Sans',sans-serif;outline:none;"
-                  oninput="filterFonts(this.value)">
-                <div id="fontList" style="background:var(--s3);border:1px solid var(--bd);border-top:none;border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;display:none;position:absolute;width:100%;z-index:100;"></div>
+        <!-- Caption Style -->
+        <div class="style-panel" id="stylePanel" style="display:none">
+          <div class="sp-hd" onclick="toggleStylePanel()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">Caption Style <span id="styleArrow">▼</span></div>
+          <div id="styleInner">
+            <div class="ypos-row">
+              <div class="ypos-lbl"><span>Vertical Position</span><span id="yposVal">70%</span></div>
+              <input type="range" id="yPos" min="5" max="95" value="70" step="1" style="width:100%;accent-color:var(--y);" oninput="onYPos()">
+              <div class="ypos-marks"><span>Top</span><span>Center</span><span>Bottom</span></div>
+            </div>
+            <div class="sfi">
+              <label>Caption Mode</label>
+              <div class="mode-row">
+                <button class="mode-btn active" id="modeSingle" onclick="setMode('single');savePreset();">Single Word</button>
+                <button class="mode-btn" id="modeMulti" onclick="setMode('multi');savePreset();">Multi Word</button>
+                <button class="mode-btn" id="modeHighlight" onclick="setMode('highlight');savePreset();">✨ Highlight</button>
               </div>
-              <div id="fontSelected" style="font-size:10px;color:var(--y);margin-top:3px;font-weight:600;"></div>
-              <input type="hidden" id="fontFamily" value="Impact">
             </div>
-            <div class="sfi">
-              <label>Style</label>
-              <select id="textStyle" onchange="drawOverlay();savePreset();">
-                <option value="bold">Bold</option>
-                <option value="normal">Normal</option>
-                <option value="italic">Italic</option>
-                <option value="bold italic">Bold Italic</option>
-              </select>
+            <div class="hc-row" id="hlColorRow" style="display:none">
+              <span class="hc-lbl">Highlight Color</span>
+              <input type="color" id="highlightColor" value="#f5e132" style="width:50px;height:26px;border:1px solid var(--bd);border-radius:5px;background:var(--s3);cursor:pointer;" oninput="drawOverlay();savePreset();">
             </div>
-            <div class="sfi">
-              <label>Case</label>
-              <select id="textCase" onchange="drawOverlay();savePreset();">
-                <option value="upper">UPPERCASE</option>
-                <option value="normal">Normal</option>
-                <option value="lower">lowercase</option>
-              </select>
+            <div class="sg" style="margin-top:10px;">
+              <div class="sfi" style="grid-column:1/-1">
+                <label>Font</label>
+                <div style="position:relative">
+                  <input type="text" id="fontSearch" placeholder="Search fonts..." autocomplete="off"
+                    style="width:100%;background:var(--s3);border:1px solid var(--bd);color:var(--tx);padding:5px 7px;border-radius:6px 6px 0 0;font-size:11px;font-family:'DM Sans',sans-serif;outline:none;"
+                    oninput="filterFonts(this.value)" onfocus="document.getElementById('fontList').style.display='block'">
+                  <div id="fontList" style="background:var(--s3);border:1px solid var(--bd);border-top:none;border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;display:none;position:absolute;width:100%;z-index:100;"></div>
+                </div>
+                <div id="fontSelected" style="font-size:10px;color:var(--y);margin-top:3px;font-weight:600;"></div>
+                <input type="hidden" id="fontFamily" value="Impact">
+              </div>
+              <div class="sfi">
+                <label>Style</label>
+                <select id="textStyle" onchange="drawOverlay();savePreset();">
+                  <option value="bold">Bold</option>
+                  <option value="normal">Normal</option>
+                  <option value="italic">Italic</option>
+                  <option value="bold italic">Bold Italic</option>
+                </select>
+              </div>
+              <div class="sfi">
+                <label>Case</label>
+                <select id="textCase" onchange="drawOverlay();savePreset();">
+                  <option value="upper">UPPERCASE</option>
+                  <option value="normal">Normal</option>
+                  <option value="lower">lowercase</option>
+                </select>
+              </div>
+            </div>
+            <div class="sg2">
+              <div class="sfi">
+                <label>Size <span class="rv" id="sizeVal">4%</span></label>
+                <div class="rr"><input type="range" id="fontSize" min="2" max="12" value="4" step=".5" oninput="document.getElementById('sizeVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
+              </div>
+              <div class="sfi">
+                <label>Outline <span class="rv" id="outlineVal">15%</span></label>
+                <div class="rr"><input type="range" id="outlineWidth" min="0" max="40" value="15" step="1" oninput="document.getElementById('outlineVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
+              </div>
+              <div class="sfi"><label>Text Color</label><input type="color" id="textColor" value="#ffffff" oninput="drawOverlay();savePreset();"></div>
+              <div class="sfi"><label>Outline Color</label><input type="color" id="outlineColor" value="#000000" oninput="drawOverlay();savePreset();"></div>
+            </div>
+            <div class="sg3">
+              <div class="sfi" style="margin-top:8px;">
+                <label>Shadow <span class="rv" id="shadowVal">0%</span></label>
+                <div class="rr"><input type="range" id="shadowSize" min="0" max="50" value="0" step="1" oninput="document.getElementById('shadowVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
+              </div>
             </div>
           </div>
-
-          <div class="sg2">
-            <div class="sfi">
-              <label>Size <span class="rv" id="sizeVal">4%</span></label>
-              <div class="rr"><input type="range" id="fontSize" min="2" max="12" value="4" step=".5" oninput="document.getElementById('sizeVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
-            </div>
-            <div class="sfi">
-              <label>Outline <span class="rv" id="outlineVal">15%</span></label>
-              <div class="rr"><input type="range" id="outlineWidth" min="0" max="40" value="15" step="1" oninput="document.getElementById('outlineVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
-            </div>
-            <div class="sfi">
-              <label>Text Color</label>
-              <input type="color" id="textColor" value="#ffffff" oninput="drawOverlay();savePreset();">
-            </div>
-            <div class="sfi">
-              <label>Outline Color</label>
-              <input type="color" id="outlineColor" value="#000000" oninput="drawOverlay();savePreset();">
-            </div>
-          </div>
-
-          <div class="sg3">
-            <div class="sfi" style="margin-top:8px;">
-              <label>Shadow <span class="rv" id="shadowVal">0%</span></label>
-              <div class="rr"><input type="range" id="shadowSize" min="0" max="50" value="0" step="1" oninput="document.getElementById('shadowVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
-            </div>
-          </div>
-
         </div>
-      </div>
 
+        <!-- Translate button -->
+        <button class="submit" id="translateBtn" onclick="startTranslation()">→ Process Video</button>
 
-      <!-- Translate button -->
-      <button class="submit" id="translateBtn" onclick="startTranslation()">→ Translate to Spanish</button>
-
-
-      <!-- Queue indicator -->
-      <div class="queue-bar" id="queueBar">⏳ Your job is queued — please wait...</div>
-
-      <!-- Progress -->
-      <div class="prog-wrap" id="progWrap">
-        <div class="prog-lbl">
-          <span id="progLbl">Processing...</span>
-          <span id="progPct">0%</span>
+        <!-- Queue -->
+        <div class="prog-wrap" id="dubProgWrap">
+          <div class="prog-lbl"><span id="dubProgLbl">Processing...</span><span id="dubProgPct">0%</span></div>
+          <div class="prog-track"><div class="prog-fill" id="dubProgFill"></div></div>
+          <div class="prog-eta" id="dubProgEta"></div>
         </div>
-        <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
-        <div class="prog-eta" id="progEta"></div>
-      </div>
 
-      <!-- Done -->
-      <div class="done-box" id="doneBox">
-        <div class="done-title">// DONE ✓</div>
-        <video id="resultVideo" controls playsinline style="width:100%;border-radius:7px;margin-top:5px;"></video>
-        <a class="dl-btn" id="dlBtn" href="#" download="dubbed_video.mp4">⬇ Download Video</a>
-        <div id="speakerClips" style="margin-top:16px;"></div>
-      </div>
-
-      <!-- Error -->
-      <div class="err-box" id="errBox">
-        <div class="err-title">// ERROR</div>
-        <div class="errmsg" id="errMsg"></div>
-      </div>
-
-    </div>
-
-    <!-- Right preview -->
-    <div class="right">
-      <div class="phone-wrap" id="phoneWrap">
-        <div class="empty-state" id="emptyState">
-          <span>📱</span>
-          <p>Upload a video</p>
+        <!-- Done -->
+        <div class="done-box" id="dubDoneBox">
+          <div class="done-title" id="dubDoneTitle">// DONE ✓</div>
+          <video id="dubResultVideo" controls playsinline style="width:100%;border-radius:7px;margin-top:5px;"></video>
+          <a class="dl-btn" id="dubDlBtn" href="#" download="dubbed_video.mp4">⬇ Download Video</a>
         </div>
-        <video id="previewVideo" preload="metadata" controls></video>
-        <canvas id="selCanvas"></canvas>
+
+        <!-- Error -->
+        <div class="err-box" id="dubErrBox">
+          <div class="err-title">// ERROR</div>
+          <div class="errmsg" id="dubErrMsg"></div>
+        </div>
+
       </div>
-      <div class="hint-bar">
-        <span class="hint-txt" id="hintTxt">Upload a video to preview</span>
-        <button class="clear-btn" id="clearBtn" onclick="clearBox()">✕ Clear</button>
+
+      <!-- Right preview - Dubbing -->
+      <div class="right">
+        <div class="phone-wrap" id="dubPhoneWrap">
+          <div class="empty-state" id="dubEmptyState"><span>📱</span><p>Upload a video</p></div>
+          <video class="phone-video" id="dubPreviewVideo" preload="metadata" controls></video>
+          <canvas class="sel-canvas" id="selCanvas"></canvas>
+        </div>
+        <div class="hint-bar">
+          <span class="hint-txt" id="hintTxt">Upload a video to preview</span>
+          <button class="clear-btn" id="clearBtn" onclick="clearBox()">✕ Clear</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
+
+  <!-- ══ CAPTION REMOVER TAB ══ -->
+  <div class="tab-panel" id="tab-remover">
+    <div class="workspace">
+      <div class="left">
+
+        <!-- Upload -->
+        <div class="upload-zone" id="remUploadZone">
+          <input type="file" id="remFileInput" accept="video/mp4,video/quicktime,.mp4,.mov" style="display:none">
+          <span class="up-icon">✂️</span>
+          <div class="up-title">Drop video here</div>
+          <div class="up-hint">MP4 or MOV · Up to 500MB</div>
+          <div class="up-name" id="remFileName"></div>
+        </div>
+
+        <!-- Remove button -->
+        <button class="submit" id="remBtn" onclick="startRemoval()" disabled>✂️ Remove Captions</button>
+
+        <!-- Progress -->
+        <div class="prog-wrap" id="remProgWrap">
+          <div class="prog-lbl"><span id="remProgLbl">Detecting captions...</span><span id="remProgPct">0%</span></div>
+          <div class="prog-track"><div class="prog-fill" id="remProgFill"></div></div>
+          <div class="prog-eta" id="remProgEta">This takes 2–5 min depending on video length</div>
+        </div>
+
+        <!-- Done -->
+        <div class="done-box" id="remDoneBox">
+          <div class="done-title">// CAPTIONS REMOVED ✓</div>
+          <a class="dl-btn" id="remDlBtn" href="#" download="clean_video.mp4">⬇ Download Clean Video</a>
+        </div>
+
+        <!-- Error -->
+        <div class="err-box" id="remErrBox">
+          <div class="err-title">// ERROR</div>
+          <div class="errmsg" id="remErrMsg"></div>
+        </div>
+
+        <!-- Info -->
+        <div class="info-box">
+          <b>How it works</b><br>
+          1. EasyOCR scans frames to locate all caption text<br>
+          2. A pixel mask is built around detected regions<br>
+          3. LaMa AI inpaints those regions with background<br>
+          4. Video is reassembled with your original audio
+        </div>
+
+      </div>
+
+      <!-- Right preview - Remover -->
+      <div class="right">
+        <div class="phone-wrap" id="remPhoneWrap">
+          <div class="empty-state" id="remEmptyState"><span>📱</span><p>Upload a video to preview</p></div>
+          <video class="phone-video" id="remPreviewVideo" preload="metadata" controls></video>
+        </div>
+        <div class="preview-lbl" id="remPreviewLbl">ORIGINAL</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
 
 <script>
-const fileInput = document.getElementById('fileInput');
+// ══════════════════════════════════════════════
+// TAB SWITCHING
+// ══════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+  const titles = { dub: ['Dubbing','Translate video'], remover: ['Caption Remover','AI-powered · EasyOCR + LaMa'] };
+  document.getElementById('topTitle').textContent = titles[tab][0];
+  document.getElementById('topSub').textContent = titles[tab][1];
+}
+
+function soon() { alert('Coming soon!'); }
+
+// ══════════════════════════════════════════════
+// CAPTION REMOVER TAB
+// ══════════════════════════════════════════════
+const remFileInput = document.getElementById('remFileInput');
+const remUploadZone = document.getElementById('remUploadZone');
+const remPreviewVideo = document.getElementById('remPreviewVideo');
+
+remUploadZone.addEventListener('click', () => remFileInput.click());
+remUploadZone.addEventListener('dragover', e => { e.preventDefault(); remUploadZone.classList.add('drag'); });
+remUploadZone.addEventListener('dragleave', () => remUploadZone.classList.remove('drag'));
+remUploadZone.addEventListener('drop', e => {
+  e.preventDefault(); remUploadZone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) loadRemFile(f);
+});
+remFileInput.addEventListener('change', () => { if (remFileInput.files[0]) loadRemFile(remFileInput.files[0]); });
+
+function loadRemFile(f) {
+  document.getElementById('remFileName').textContent = '📎 ' + f.name;
+  remUploadZone.classList.add('has-file');
+  document.getElementById('remEmptyState').style.display = 'none';
+  remPreviewVideo.style.display = 'block';
+  remPreviewVideo.src = URL.createObjectURL(f);
+  document.getElementById('remBtn').disabled = false;
+  document.getElementById('remPreviewLbl').textContent = 'ORIGINAL';
+  hide('remDoneBox'); hide('remErrBox');
+}
+
+async function startRemoval() {
+  const f = remFileInput.files[0];
+  if (!f) { alert('Please select a video first'); return; }
+  const btn = document.getElementById('remBtn');
+  btn.disabled = true;
+  hide('remDoneBox'); hide('remErrBox');
+  startRemProg();
+
+  const fd = new FormData();
+  fd.append('video', f);
+
+  try {
+    const res = await fetch('/remove-captions', { method: 'POST', body: fd });
+    const data = await res.json();
+    finishRemProg();
+    if (data.success) {
+      show('remDoneBox');
+      document.getElementById('remDlBtn').href = data.videoUrl;
+      remPreviewVideo.src = data.videoUrl;
+      document.getElementById('remPreviewLbl').textContent = 'RESULT — CAPTIONS REMOVED ✓';
+    } else {
+      show('remErrBox');
+      document.getElementById('remErrMsg').textContent = data.error;
+    }
+  } catch(err) {
+    finishRemProg();
+    show('remErrBox');
+    document.getElementById('remErrMsg').textContent = 'Server error: ' + err.message;
+  }
+  btn.disabled = false;
+}
+
+const REM_STEPS = [
+  { label: 'Loading AI models...', duration: 15 },
+  { label: 'Extracting frames...', duration: 20 },
+  { label: 'Detecting caption regions (EasyOCR)...', duration: 35 },
+  { label: 'Inpainting with LaMa AI...', duration: 120 },
+  { label: 'Reassembling video...', duration: 20 },
+];
+let remProgInterval = null;
+
+function startRemProg() {
+  clearInterval(remProgInterval);
+  document.getElementById('remProgWrap').style.display = 'block';
+  document.getElementById('remProgFill').style.width = '0%';
+  document.getElementById('remProgPct').textContent = '0%';
+  const totalMs = REM_STEPS.reduce((a, s) => a + s.duration * 1000, 0);
+  const start = Date.now();
+  remProgInterval = setInterval(() => {
+    const elapsed = (Date.now() - start) / 1000;
+    let cum = 0, lbl = REM_STEPS[REM_STEPS.length - 1].label;
+    for (const s of REM_STEPS) { cum += s.duration; if (elapsed < cum) { lbl = s.label; break; } }
+    const pct = Math.min(93, (elapsed / (totalMs / 1000)) * 100);
+    document.getElementById('remProgFill').style.width = pct.toFixed(1) + '%';
+    document.getElementById('remProgPct').textContent = Math.round(pct) + '%';
+    document.getElementById('remProgLbl').textContent = lbl;
+    const rem = Math.max(0, totalMs / 1000 - elapsed);
+    document.getElementById('remProgEta').textContent = rem > 5 ? `~${Math.ceil(rem)}s remaining` : 'Almost done...';
+  }, 400);
+}
+
+function finishRemProg() {
+  clearInterval(remProgInterval);
+  document.getElementById('remProgFill').style.width = '100%';
+  document.getElementById('remProgPct').textContent = '100%';
+  document.getElementById('remProgLbl').textContent = 'Done!';
+  document.getElementById('remProgEta').textContent = 'Complete!';
+  setTimeout(() => { document.getElementById('remProgWrap').style.display = 'none'; }, 1500);
+}
+
+// ══════════════════════════════════════════════
+// DUBBING TAB — all original logic
+// ══════════════════════════════════════════════
+const dubFileInput = document.getElementById('dubFileInput');
+const dubUploadZone = document.getElementById('dubUploadZone');
+const dubPreviewVideo = document.getElementById('dubPreviewVideo');
 const selCanvas = document.getElementById('selCanvas');
 const ctx = selCanvas.getContext('2d');
-const previewVideo = document.getElementById('previewVideo');
-const phoneWrap = document.getElementById('phoneWrap');
+const dubPhoneWrap = document.getElementById('dubPhoneWrap');
+
 let captionBox = null, isDrawing = false, sx = 0, sy = 0;
 let captionYPct = 70;
 let captionMode = 'single';
-let selectedProvider = 'modelslab';
-let progInterval = null;
-let progStartTime = null;
+let dubProgInterval = null;
 
-// ── PRESET ───────────────────────────────────────────────────────────────────
-function savePreset() {
-  const p = {
-    yPct: captionYPct,
-    fontFamily: document.getElementById('fontFamily').value,
-    fontSearchDisplay: document.getElementById('fontSearch').value,
-    fontSelectedText: document.getElementById('fontSelected').textContent,
-    fontSize: document.getElementById('fontSize').value,
-    textStyle: document.getElementById('textStyle').value,
-    textCase: document.getElementById('textCase').value,
-    textColor: document.getElementById('textColor').value,
-    outlineColor: document.getElementById('outlineColor').value,
-    outlineWidth: document.getElementById('outlineWidth').value,
-    shadowSize: document.getElementById('shadowSize').value,
-    captionMode: captionMode,
-    highlightColor: document.getElementById('highlightColor').value,
-    language: document.getElementById('langSelect').value,
-    removeCaption: document.getElementById('removeToggle').checked,
-    addCaption: document.getElementById('addToggle').checked,
-    captionBox: captionBox,
-    stylePanelOpen: document.getElementById('styleInner') ? document.getElementById('styleInner').style.display !== 'none' : true,
-  };
-  localStorage.setItem('dubshorts_preset', JSON.stringify(p));
-}
-
-function loadPreset() {
-  try {
-    const p = JSON.parse(localStorage.getItem('dubshorts_preset'));
-    if (!p) return;
-    if (p.yPct !== undefined) { captionYPct = p.yPct; document.getElementById('yPos').value = p.yPct; document.getElementById('yposVal').textContent = p.yPct + '%'; }
-    if (p.fontFamily) {
-      document.getElementById('fontFamily').value = p.fontFamily;
-      if (p.fontSearchDisplay) document.getElementById('fontSearch').value = p.fontSearchDisplay;
-      if (p.fontSelectedText) document.getElementById('fontSelected').textContent = p.fontSelectedText;
-    }
-    if (p.fontSize) { document.getElementById('fontSize').value = p.fontSize; document.getElementById('sizeVal').textContent = p.fontSize + '%'; }
-    if (p.textStyle) document.getElementById('textStyle').value = p.textStyle;
-    if (p.textCase) document.getElementById('textCase').value = p.textCase;
-    if (p.textColor) document.getElementById('textColor').value = p.textColor;
-    if (p.outlineColor) document.getElementById('outlineColor').value = p.outlineColor;
-    if (p.outlineWidth) { document.getElementById('outlineWidth').value = p.outlineWidth; document.getElementById('outlineVal').textContent = p.outlineWidth + '%'; }
-    if (p.shadowSize) { document.getElementById('shadowSize').value = p.shadowSize; document.getElementById('shadowVal').textContent = p.shadowSize + '%'; }
-    if (p.captionMode) setMode(p.captionMode);
-    if (p.highlightColor) document.getElementById('highlightColor').value = p.highlightColor;
-    if (p.language) { document.getElementById('langSelect').value = p.language; updateTranslateBtn(); }
-    if (p.removeCaption) { document.getElementById('removeToggle').checked = true; onRemove(); }
-    if (p.addCaption) { document.getElementById('addToggle').checked = true; onAdd(); }
-    if (p.captionBox) { captionBox = p.captionBox; document.getElementById('clearBtn').style.display = 'block'; drawOverlay(); }
-    if (p.stylePanelOpen === false) {
-      const inner = document.getElementById('styleInner');
-      const arrow = document.getElementById('styleArrow');
-      if (inner) inner.style.display = 'none';
-      if (arrow) arrow.textContent = '\u25B6';
-    }
-  } catch(e) { console.error('loadPreset error:', e); }
-}
-
-// ── CAPTION MODE ─────────────────────────────────────────────────────────────
-function setMode(mode) {
-  captionMode = mode;
-  ['single','multi','highlight'].forEach(function(m) {
-    const el = document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1));
-    if (el) el.classList.toggle('active', m === mode);
-  });
-  document.getElementById('hlColorRow').style.display = mode === 'highlight' ? 'flex' : 'none';
-  drawOverlay();
-}
-
-// ── CANVAS ────────────────────────────────────────────────────────────────────
-function fitCanvas() {
-  selCanvas.width = phoneWrap.offsetWidth;
-  selCanvas.height = phoneWrap.offsetHeight;
-  drawOverlay();
-}
-
-// ── UPLOAD ────────────────────────────────────────────────────────────────────
-const uploadZone = document.getElementById('uploadZone');
-
-uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); uploadZone.style.borderColor = 'var(--y)'; });
-uploadZone.addEventListener('dragleave', function() { uploadZone.style.borderColor = ''; });
-uploadZone.addEventListener('drop', function(e) {
-  e.preventDefault();
-  uploadZone.style.borderColor = '';
+dubUploadZone.addEventListener('click', () => dubFileInput.click());
+dubUploadZone.addEventListener('dragover', e => { e.preventDefault(); dubUploadZone.style.borderColor = 'var(--y)'; });
+dubUploadZone.addEventListener('dragleave', () => { dubUploadZone.style.borderColor = ''; });
+dubUploadZone.addEventListener('drop', e => {
+  e.preventDefault(); dubUploadZone.style.borderColor = '';
   const f = e.dataTransfer.files[0];
   if (f && (f.type.startsWith('video/') || f.name.match(/\.mp4$|\.mov$/i))) {
-    const dt = new DataTransfer();
-    dt.items.add(f);
-    fileInput.files = dt.files;
-    fileInput.dispatchEvent(new Event('change'));
+    const dt = new DataTransfer(); dt.items.add(f); dubFileInput.files = dt.files;
+    dubFileInput.dispatchEvent(new Event('change'));
   }
 });
-
-fileInput.addEventListener('change', function() {
-  const f = fileInput.files[0]; if (!f) return;
-  document.getElementById('fileName').textContent = '\uD83D\uDCCE ' + f.name;
-  document.getElementById('uploadZone').classList.add('has-file');
-  document.getElementById('emptyState').style.display = 'none';
-  previewVideo.style.display = 'block';
-  previewVideo.src = URL.createObjectURL(f);
-  previewVideo.addEventListener('loadedmetadata', function() {
+dubFileInput.addEventListener('change', () => {
+  const f = dubFileInput.files[0]; if (!f) return;
+  document.getElementById('dubFileName').textContent = '📎 ' + f.name;
+  dubUploadZone.classList.add('has-file');
+  document.getElementById('dubEmptyState').style.display = 'none';
+  dubPreviewVideo.style.display = 'block';
+  dubPreviewVideo.src = URL.createObjectURL(f);
+  dubPreviewVideo.addEventListener('loadedmetadata', () => {
     if (captionBox) { document.getElementById('clearBtn').style.display = 'block'; drawOverlay(); }
     if (document.getElementById('removeToggle').checked) { selCanvas.style.pointerEvents = 'auto'; selCanvas.style.cursor = 'crosshair'; }
   }, { once: true });
-  updateTranslateBtn();
-  setTimeout(fitCanvas, 150);
-  updateHint();
+  updateTranslateBtn(); setTimeout(fitCanvas, 150); updateHint();
 });
 
-function onLangChange() { updateTranslateBtn(); savePreset(); }
-
-function updateTranslateBtn() {
-  const lang = document.getElementById('langSelect').value;
-  const langNames = { none:'Process Video', es:'Spanish', hi:'Hindi', pt:'Portuguese', ja:'Japanese', fr:'French', pl:'Polish', it:'Italian', zh:'Chinese' };
-  const btn = document.getElementById('translateBtn');
-  if (btn) btn.textContent = lang === 'none' ? '\u2192 Process Video' : '\u2192 Translate to ' + (langNames[lang] || lang);
+function fitCanvas() {
+  selCanvas.width = dubPhoneWrap.offsetWidth;
+  selCanvas.height = dubPhoneWrap.offsetHeight;
+  drawOverlay();
 }
-
 window.addEventListener('resize', fitCanvas);
 setTimeout(fitCanvas, 300);
 
@@ -534,327 +596,303 @@ function onRemove() {
   selCanvas.style.cursor = on ? 'crosshair' : 'default';
   updateHint();
 }
-
 function onAdd() {
   const on = document.getElementById('addToggle').checked;
   document.getElementById('addCard').classList.toggle('active', on);
   document.getElementById('addCard').classList.toggle('on', on);
   document.getElementById('stylePanel').style.display = on ? 'block' : 'none';
-  drawOverlay();
-  updateHint();
+  drawOverlay(); updateHint();
 }
-
 function updateHint() {
   const rem = document.getElementById('removeToggle').checked;
   const add = document.getElementById('addToggle').checked;
   const h = document.getElementById('hintTxt');
-  if (!fileInput.files[0]) { h.textContent = 'Upload a video to preview'; return; }
-  if (rem && add) h.textContent = 'Draw box over captions \u00B7 Preview shows translated caption position';
+  if (!dubFileInput.files[0]) { h.textContent = 'Upload a video to preview'; return; }
+  if (rem && add) h.textContent = 'Draw box over captions · Preview shows translated caption position';
   else if (rem) h.textContent = 'Draw a box over the captions you want removed';
   else if (add) h.textContent = 'Preview shows where translated captions will appear';
   else h.textContent = 'Enable an option to get started';
 }
-
 function onYPos() {
   captionYPct = parseInt(document.getElementById('yPos').value);
   document.getElementById('yposVal').textContent = captionYPct + '%';
-  drawOverlay();
-  savePreset();
+  drawOverlay(); savePreset();
+}
+function updateTranslateBtn() {
+  const lang = document.getElementById('langSelect').value;
+  const names = { none:'Process Video',es:'Spanish',hi:'Hindi',pt:'Portuguese',ja:'Japanese',fr:'French',pl:'Polish',it:'Italian',zh:'Chinese' };
+  document.getElementById('translateBtn').textContent = lang === 'none' ? '→ Process Video' : '→ Translate to ' + (names[lang] || lang);
 }
 
 // Canvas drawing
-selCanvas.addEventListener('mousedown', function(e) {
+selCanvas.addEventListener('mousedown', e => {
   if (!document.getElementById('removeToggle').checked) return;
   const r = selCanvas.getBoundingClientRect();
   sx = e.clientX - r.left; sy = e.clientY - r.top;
   isDrawing = true; captionBox = null;
   document.getElementById('clearBtn').style.display = 'none';
 });
-selCanvas.addEventListener('mousemove', function(e) {
+selCanvas.addEventListener('mousemove', e => {
   if (!isDrawing) return;
   const r = selCanvas.getBoundingClientRect();
   ctx.clearRect(0, 0, selCanvas.width, selCanvas.height);
   drawBox(sx, sy, e.clientX - r.left - sx, e.clientY - r.top - sy);
   if (document.getElementById('addToggle').checked) drawCaption();
 });
-selCanvas.addEventListener('mouseup', function(e) {
+selCanvas.addEventListener('mouseup', e => {
   if (!isDrawing) return; isDrawing = false;
   const r = selCanvas.getBoundingClientRect();
   const bw = e.clientX - r.left - sx, bh = e.clientY - r.top - sy;
   if (Math.abs(bw) > 6 && Math.abs(bh) > 6) {
-    captionBox = { x: Math.min(sx, sx+bw)/selCanvas.width, y: Math.min(sy, sy+bh)/selCanvas.height, w: Math.abs(bw)/selCanvas.width, h: Math.abs(bh)/selCanvas.height };
-    document.getElementById('clearBtn').style.display = 'block';
-    savePreset();
+    captionBox = { x:Math.min(sx,sx+bw)/selCanvas.width, y:Math.min(sy,sy+bh)/selCanvas.height, w:Math.abs(bw)/selCanvas.width, h:Math.abs(bh)/selCanvas.height };
+    document.getElementById('clearBtn').style.display = 'block'; savePreset();
   }
   drawOverlay();
 });
 
-function drawBox(x, y, w, h) {
+function drawBox(x,y,w,h) {
   ctx.save();
-  ctx.strokeStyle = 'rgba(245,225,50,0.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
-  ctx.strokeRect(x, y, w, h);
-  ctx.fillStyle = 'rgba(245,225,50,0.07)'; ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle='rgba(245,225,50,0.85)';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);
+  ctx.strokeRect(x,y,w,h);ctx.fillStyle='rgba(245,225,50,0.07)';ctx.fillRect(x,y,w,h);
   ctx.restore();
 }
-
 function drawCaption() {
-  const W = selCanvas.width, H = selCanvas.height;
-  if (!W || !H) return;
-  const fsp = parseFloat(document.getElementById('fontSize').value || 4) / 100;
-  const fs = Math.max(8, Math.round(H * fsp));
-  const ff = document.getElementById('fontFamily').value || 'sans-serif';
-  const ts = document.getElementById('textStyle').value || 'bold';
-  const tc = document.getElementById('textColor').value || '#fff';
-  const oc = document.getElementById('outlineColor').value || '#000';
-  const ow = parseFloat(document.getElementById('outlineWidth').value || 15) / 100;
-  const tcase = document.getElementById('textCase').value || 'upper';
-  const hc = document.getElementById('highlightColor').value || '#f5e132';
-  const shadow = parseFloat(document.getElementById('shadowSize').value || 0) / 100;
-  const y = (captionYPct / 100) * H;
-  ctx.save();
-  ctx.font = ts + ' ' + fs + 'px ' + ff;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  if (captionMode === 'single') {
-    const txt = tcase === 'lower' ? 'hola mundo' : tcase === 'normal' ? 'Hola Mundo' : 'HOLA MUNDO';
-    if (shadow > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadow * fs; ctx.shadowOffsetY = shadow * fs * 0.3; }
-    if (ow > 0) { ctx.lineWidth = fs * ow; ctx.strokeStyle = oc; ctx.lineJoin = 'round'; ctx.strokeText(txt, W/2, y); }
-    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-    ctx.fillStyle = tc; ctx.fillText(txt, W/2, y);
+  const W=selCanvas.width,H=selCanvas.height; if (!W||!H) return;
+  const fsp=parseFloat(document.getElementById('fontSize').value||4)/100;
+  const fs=Math.max(8,Math.round(H*fsp));
+  const ff=document.getElementById('fontFamily').value||'sans-serif';
+  const ts=document.getElementById('textStyle').value||'bold';
+  const tc=document.getElementById('textColor').value||'#fff';
+  const oc=document.getElementById('outlineColor').value||'#000';
+  const ow=parseFloat(document.getElementById('outlineWidth').value||15)/100;
+  const tcase=document.getElementById('textCase').value||'upper';
+  const hc=document.getElementById('highlightColor').value||'#f5e132';
+  const shadow=parseFloat(document.getElementById('shadowSize').value||0)/100;
+  const y=(captionYPct/100)*H;
+  ctx.save(); ctx.font=ts+' '+fs+'px '+ff; ctx.textAlign='center'; ctx.textBaseline='middle';
+  if (captionMode==='single') {
+    const txt=tcase==='lower'?'hola mundo':tcase==='normal'?'Hola Mundo':'HOLA MUNDO';
+    if (shadow>0){ctx.shadowColor='rgba(0,0,0,0.9)';ctx.shadowBlur=shadow*fs;ctx.shadowOffsetY=shadow*fs*0.3;}
+    if (ow>0){ctx.lineWidth=fs*ow;ctx.strokeStyle=oc;ctx.lineJoin='round';ctx.strokeText(txt,W/2,y);}
+    ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.fillStyle=tc;ctx.fillText(txt,W/2,y);
   } else {
-    const words = tcase === 'upper' ? ['HOLA','MUNDO','AMIGOS'] : tcase === 'lower' ? ['hola','mundo','amigos'] : ['Hola','Mundo','Amigos'];
-    let curX = W/2 - words.reduce(function(a, ww) { return a + ctx.measureText(ww + ' ').width; }, 0) / 2;
-    words.forEach(function(word, i) {
-      const ww = ctx.measureText(word + ' ').width;
-      const cx = curX + ww/2 - ctx.measureText(' ').width/2;
-      const color = (captionMode === 'highlight' && i === 1) ? hc : tc;
-      if (shadow > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadow * fs; ctx.shadowOffsetY = shadow * fs * 0.3; }
-      if (ow > 0) { ctx.lineWidth = fs * ow; ctx.strokeStyle = oc; ctx.lineJoin = 'round'; ctx.strokeText(word, cx, y); }
-      ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      ctx.fillStyle = color; ctx.fillText(word, cx, y);
-      curX += ww;
+    const words=tcase==='upper'?['HOLA','MUNDO','AMIGOS']:tcase==='lower'?['hola','mundo','amigos']:['Hola','Mundo','Amigos'];
+    let curX=W/2-words.reduce((a,ww)=>a+ctx.measureText(ww+' ').width,0)/2;
+    words.forEach((word,i)=>{
+      const ww=ctx.measureText(word+' ').width; const cx=curX+ww/2-ctx.measureText(' ').width/2;
+      const color=(captionMode==='highlight'&&i===1)?hc:tc;
+      if (shadow>0){ctx.shadowColor='rgba(0,0,0,0.9)';ctx.shadowBlur=shadow*fs;ctx.shadowOffsetY=shadow*fs*0.3;}
+      if (ow>0){ctx.lineWidth=fs*ow;ctx.strokeStyle=oc;ctx.lineJoin='round';ctx.strokeText(word,cx,y);}
+      ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.fillStyle=color;ctx.fillText(word,cx,y);curX+=ww;
     });
   }
   ctx.restore();
 }
-
 function drawOverlay() {
-  ctx.clearRect(0, 0, selCanvas.width, selCanvas.height);
-  if (captionBox && document.getElementById('removeToggle').checked) {
-    drawBox(captionBox.x*selCanvas.width, captionBox.y*selCanvas.height, captionBox.w*selCanvas.width, captionBox.h*selCanvas.height);
-  }
+  ctx.clearRect(0,0,selCanvas.width,selCanvas.height);
+  if (captionBox&&document.getElementById('removeToggle').checked) drawBox(captionBox.x*selCanvas.width,captionBox.y*selCanvas.height,captionBox.w*selCanvas.width,captionBox.h*selCanvas.height);
   if (document.getElementById('addToggle').checked) drawCaption();
 }
+function clearBox() { captionBox=null; document.getElementById('clearBtn').style.display='none'; drawOverlay(); savePreset(); }
+selCanvas.style.pointerEvents = 'none';
 
-function clearBox() { captionBox = null; document.getElementById('clearBtn').style.display = 'none'; drawOverlay(); savePreset(); }
-
-// ── PROGRESS ──────────────────────────────────────────────────────────────────
-const STEP_TIMES = { removal:30, upload:15, dubbing:120, transcription:20, captions:60, merge:10 };
-
-function getEstimatedTotal(hasRemoval, hasCaptions) {
-  let total = STEP_TIMES.upload + STEP_TIMES.dubbing + STEP_TIMES.merge;
-  if (hasRemoval) total += STEP_TIMES.removal;
-  if (hasCaptions) total += STEP_TIMES.transcription + STEP_TIMES.captions;
-  return total;
-}
-
-function startProg() {
-  clearInterval(progInterval);
+// Dubbing progress
+const DUB_STEPS = [
+  { label:'Uploading video...', duration:15 },
+  { label:'Dubbing audio with ElevenLabs...', duration:120 },
+  { label:'Transcribing dubbed audio...', duration:20 },
+  { label:'Burning captions...', duration:60 },
+  { label:'Merging video...', duration:10 },
+];
+function startDubProg() {
+  clearInterval(dubProgInterval);
   const hasRemoval = document.getElementById('removeToggle').checked && captionBox;
   const hasCaptions = document.getElementById('addToggle').checked;
-  const totalSecs = getEstimatedTotal(hasRemoval, hasCaptions);
-  progStartTime = Date.now();
-  document.getElementById('progWrap').style.display = 'block';
-  document.getElementById('progFill').style.width = '0%';
-  document.getElementById('progPct').textContent = '0%';
-  document.getElementById('progEta').textContent = 'Est. ~' + Math.ceil(totalSecs/60) + ' min';
-  progInterval = setInterval(function() {
-    const elapsed = (Date.now() - progStartTime) / 1000;
-    const pct = Math.min(91, (elapsed/totalSecs)*100);
-    document.getElementById('progFill').style.width = pct.toFixed(1) + '%';
-    document.getElementById('progPct').textContent = Math.round(pct) + '%';
-    const remaining = Math.max(0, totalSecs - elapsed);
-    document.getElementById('progEta').textContent = remaining > 5 ? '~' + Math.ceil(remaining) + 's remaining' : 'Almost done...';
+  const steps = DUB_STEPS.filter((s,i) => {
+    if (i===2||i===3) return hasCaptions;
+    return true;
+  });
+  const totalMs = steps.reduce((a,s)=>a+s.duration*1000,0);
+  const start = Date.now();
+  document.getElementById('dubProgWrap').style.display = 'block';
+  document.getElementById('dubProgFill').style.width = '0%';
+  document.getElementById('dubProgPct').textContent = '0%';
+  document.getElementById('dubProgEta').textContent = 'Est. ~' + Math.ceil(totalMs/60000) + ' min';
+  dubProgInterval = setInterval(() => {
+    const elapsed = (Date.now()-start)/1000;
+    let cum=0, lbl=steps[steps.length-1].label;
+    for (const s of steps){cum+=s.duration;if(elapsed<cum){lbl=s.label;break;}}
+    const pct=Math.min(91,(elapsed/(totalMs/1000))*100);
+    document.getElementById('dubProgFill').style.width=pct.toFixed(1)+'%';
+    document.getElementById('dubProgPct').textContent=Math.round(pct)+'%';
+    document.getElementById('dubProgLbl').textContent=lbl;
+    const rem=Math.max(0,totalMs/1000-elapsed);
+    document.getElementById('dubProgEta').textContent=rem>5?'~'+Math.ceil(rem)+'s remaining':'Almost done...';
   }, 500);
 }
-
-function finishProg() {
-  clearInterval(progInterval);
-  document.getElementById('progFill').style.width = '100%';
-  document.getElementById('progPct').textContent = '100%';
-  document.getElementById('progEta').textContent = 'Complete!';
-  setTimeout(function() { document.getElementById('progWrap').style.display = 'none'; }, 1500);
+function finishDubProg() {
+  clearInterval(dubProgInterval);
+  document.getElementById('dubProgFill').style.width='100%';
+  document.getElementById('dubProgPct').textContent='100%';
+  document.getElementById('dubProgEta').textContent='Complete!';
+  setTimeout(()=>{document.getElementById('dubProgWrap').style.display='none';},1500);
 }
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
 function getStyle() {
   return {
-    yPct: captionYPct,
-    fontFamily: document.getElementById('fontFamily').value,
-    fontSize: parseFloat(document.getElementById('fontSize').value),
-    textColor: document.getElementById('textColor').value,
-    outlineColor: document.getElementById('outlineColor').value,
-    outlineWidth: parseFloat(document.getElementById('outlineWidth').value),
-    textStyle: document.getElementById('textStyle').value,
-    textCase: document.getElementById('textCase').value,
-    shadowSize: parseFloat(document.getElementById('shadowSize').value) / 100,
-    captionMode: captionMode,
-    highlightColor: document.getElementById('highlightColor').value,
-    enabled: document.getElementById('addToggle').checked
+    yPct:captionYPct, fontFamily:document.getElementById('fontFamily').value,
+    fontSize:parseFloat(document.getElementById('fontSize').value),
+    textColor:document.getElementById('textColor').value,
+    outlineColor:document.getElementById('outlineColor').value,
+    outlineWidth:parseFloat(document.getElementById('outlineWidth').value),
+    textStyle:document.getElementById('textStyle').value,
+    textCase:document.getElementById('textCase').value,
+    shadowSize:parseFloat(document.getElementById('shadowSize').value)/100,
+    captionMode:captionMode,
+    highlightColor:document.getElementById('highlightColor').value,
+    enabled:document.getElementById('addToggle').checked
   };
 }
 
-function show(id) { document.getElementById(id).style.display = 'block'; }
-function hide(id) { document.getElementById(id).style.display = 'none'; }
-function soon(e) { e.preventDefault(); alert('Coming soon!'); }
-
-// ── TRANSLATE ─────────────────────────────────────────────────────────────────
 async function startTranslation() {
+  const f = dubFileInput.files[0]; if (!f) { alert('Please select a video'); return; }
   const btn = document.getElementById('translateBtn');
-  if (btn._mode === 'remove') {
-    const f = fileInput.files[0]; if (!f) { alert('Please select a video'); return; }
-    if (!captionBox) {
-      status('Auto-detecting caption region...');
-      const fd0 = new FormData();
-      fd0.append('video', fileInput.files[0]);
-      const r = await fetch('/auto-detect-box', { method: 'POST', body: fd0 });
-      const d = await r.json();
-      if (!d.success) { status('Auto-detect failed: ' + d.error); return; }
-      captionBox = d.box;
-      status('Caption region detected, removing...');
-    }
-    btn.disabled = true;
-    hide('doneBox'); hide('errBox');
-    startProg();
-    const fd = new FormData();
-    fd.append('video', f);
-    fd.append('captionBox', JSON.stringify(captionBox));
-    try {
-      const res = await fetch('/remove-captions-fast', { method:'POST', body:fd });
-      const data = await res.json();
-      finishProg();
-      if (data.success) {
-        show('doneBox');
-        document.getElementById('resultVideo').src = data.videoUrl;
-        document.getElementById('dlBtn').href = data.videoUrl;
-        document.querySelector('.done-title').textContent = '// DONE \u2713';
-      } else { show('errBox'); document.getElementById('errMsg').textContent = data.error; }
-    } catch(err) { finishProg(); show('errBox'); document.getElementById('errMsg').textContent = 'Could not reach the server.'; }
-    btn.disabled = false;
-    return;
-  }
-  const f = fileInput.files[0]; if (!f) { alert('Please select a video'); return; }
-  btn.disabled = true;
-  hide('doneBox'); hide('errBox');
-  document.getElementById('queueBar').classList.remove('visible');
-  startProg();
-  const fd2 = new FormData();
-  fd2.append('video', f);
-  fd2.append('language', document.getElementById('langSelect').value);
-  fd2.append('captionStyle', JSON.stringify(getStyle()));
-  fd2.append('addCaption', document.getElementById('addToggle').checked ? 'true' : 'false');
-  if (captionBox) fd2.append('captionBox', JSON.stringify(captionBox));
-  if (document.getElementById('removeToggle').checked) fd2.append('removeCaption', 'true');
+  btn.disabled = true; hide('dubDoneBox'); hide('dubErrBox');
+  startDubProg();
+  const fd = new FormData();
+  fd.append('video', f);
+  fd.append('language', document.getElementById('langSelect').value);
+  fd.append('captionStyle', JSON.stringify(getStyle()));
+  fd.append('addCaption', document.getElementById('addToggle').checked ? 'true' : 'false');
+  if (captionBox) fd.append('captionBox', JSON.stringify(captionBox));
+  if (document.getElementById('removeToggle').checked) fd.append('removeCaption', 'true');
   try {
-    const res = await fetch('/dub-speakers', { method:'POST', body:fd2 });
+    const res = await fetch('/dub-speakers', { method:'POST', body:fd });
     const data = await res.json();
-    finishProg();
+    finishDubProg();
     if (data.success) {
-      show('doneBox');
-      document.getElementById('resultVideo').src = data.videoUrl;
-      document.getElementById('dlBtn').href = data.videoUrl;
-      document.querySelector('.done-title').textContent = data.cached ? '// DONE \u2713 (cached)' : '// DONE \u2713';
-    } else { show('errBox'); document.getElementById('errMsg').textContent = data.error; }
-  } catch(err) { finishProg(); show('errBox'); document.getElementById('errMsg').textContent = 'Could not reach the server.'; }
+      show('dubDoneBox');
+      document.getElementById('dubResultVideo').src = data.videoUrl;
+      document.getElementById('dubDlBtn').href = data.videoUrl;
+      document.getElementById('dubDoneTitle').textContent = data.cached ? '// DONE ✓ (cached)' : '// DONE ✓';
+    } else { show('dubErrBox'); document.getElementById('dubErrMsg').textContent = data.error; }
+  } catch(err) { finishDubProg(); show('dubErrBox'); document.getElementById('dubErrMsg').textContent = 'Could not reach the server.'; }
   btn.disabled = false;
 }
 
-// ── FONT PICKER ───────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════
+// FONT PICKER
+// ══════════════════════════════════════════════
 const FONTS = [
-  {"name":"Impact","file":"Impact.ttf","family":"Impact"},
-  {"name":"Anton","file":"Anton-Regular.ttf","family":"Anton"},
-  {"name":"Bebas Neue","file":"BebasNeue-Regular.ttf","family":"BebasNeue"},
-  {"name":"Oswald Bold","file":"Oswald-Bold.ttf","family":"Oswald"},
-  {"name":"Barlow Condensed","file":"BarlowCondensed-Bold.ttf","family":"BarlowCondensed"},
-  {"name":"Fjalla One","file":"FjallaOne-Regular.ttf","family":"FjallaOne"},
-  {"name":"Roboto Bold","file":"Roboto-Bold.ttf","family":"Roboto"},
-  {"name":"Poppins Bold","file":"Poppins-Bold.ttf","family":"Poppins"},
-  {"name":"Lato Bold","file":"Lato-Bold.ttf","family":"Lato"},
-  {"name":"Ubuntu Bold","file":"Ubuntu-Bold.ttf","family":"Ubuntu"},
-  {"name":"Bangers","file":"Bangers-Regular.ttf","family":"Bangers"},
-  {"name":"Pacifico","file":"Pacifico-Regular.ttf","family":"Pacifico"},
-  {"name":"Permanent Marker","file":"PermanentMarker-Regular.ttf","family":"PermanentMarker"},
-  {"name":"Righteous","file":"Righteous-Regular.ttf","family":"Righteous"},
-  {"name":"Montserrat Bold","file":"Montserrat-Bold.ttf","family":"Montserrat"},
-  {"name":"DejaVu Bold","file":"DejaVuSans-Bold.ttf","family":"CaptionFont"}
+  {name:'Impact',family:'Impact'},{name:'Anton',family:'Anton'},{name:'Bebas Neue',family:'BebasNeue'},
+  {name:'Oswald Bold',family:'Oswald'},{name:'Barlow Condensed',family:'BarlowCondensed'},
+  {name:'Fjalla One',family:'FjallaOne'},{name:'Roboto Bold',family:'Roboto'},
+  {name:'Poppins Bold',family:'Poppins'},{name:'Lato Bold',family:'Lato'},
+  {name:'Ubuntu Bold',family:'Ubuntu'},{name:'Bangers',family:'Bangers'},
+  {name:'Pacifico',family:'Pacifico'},{name:'Permanent Marker',family:'PermanentMarker'},
+  {name:'Righteous',family:'Righteous'},{name:'Montserrat Bold',family:'Montserrat'},
+  {name:'DejaVu Bold',family:'CaptionFont'}
 ];
-
-function initFontPicker() {
-  renderFontList(FONTS);
-  document.getElementById('fontSearch').addEventListener('focus', function() {
-    document.getElementById('fontList').style.display = 'block';
-  });
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.sfi')) document.getElementById('fontList').style.display = 'none';
-  });
-}
-
 function renderFontList(fonts) {
-  document.getElementById('fontList').innerHTML = fonts.map(function(f) {
-    return '<div onclick="selectFont(\'' + f.family + '\',\'' + f.name + '\')" style="padding:6px 9px;font-size:11px;cursor:pointer;color:var(--tx);" onmouseover="this.style.background=\'var(--s4)\'" onmouseout="this.style.background=\'\'">' + f.name + '</div>';
-  }).join('');
+  document.getElementById('fontList').innerHTML = fonts.map(f =>
+    `<div onclick="selectFont('${f.family}','${f.name}')" style="padding:6px 9px;font-size:11px;cursor:pointer;color:var(--tx);" onmouseover="this.style.background='var(--s4)'" onmouseout="this.style.background=''"> ${f.name}</div>`
+  ).join('');
 }
-
-function filterFonts(q) {
-  document.getElementById('fontList').style.display = 'block';
-  renderFontList(FONTS.filter(function(f) { return f.name.toLowerCase().includes(q.toLowerCase()); }));
-}
-
-function selectFont(family, name) {
-  document.getElementById('fontFamily').value = family;
-  document.getElementById('fontSelected').textContent = '\u2713 ' + name;
-  document.getElementById('fontSearch').value = name;
-  document.getElementById('fontList').style.display = 'none';
+function filterFonts(q) { document.getElementById('fontList').style.display='block'; renderFontList(FONTS.filter(f=>f.name.toLowerCase().includes(q.toLowerCase()))); }
+function selectFont(family,name) {
+  document.getElementById('fontFamily').value=family;
+  document.getElementById('fontSelected').textContent='✓ '+name;
+  document.getElementById('fontSearch').value=name;
+  document.getElementById('fontList').style.display='none';
   savePreset();
-  // Wait for font to load then redraw
-  document.fonts.load('bold 40px ' + family).then(function() {
-    drawOverlay();
-  }).catch(function() {
-    drawOverlay();
-  });
+  document.fonts.load('bold 40px '+family).then(()=>drawOverlay()).catch(()=>drawOverlay());
 }
+document.addEventListener('click', e => { if (!e.target.closest('.sfi')) document.getElementById('fontList').style.display='none'; });
+renderFontList(FONTS);
 
-// ── STYLE PANEL ───────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════
+// STYLE PANEL TOGGLE
+// ══════════════════════════════════════════════
 function toggleStylePanel() {
   const inner = document.getElementById('styleInner');
   const arrow = document.getElementById('styleArrow');
   const collapsed = inner.style.display === 'none';
   inner.style.display = collapsed ? 'block' : 'none';
-  arrow.textContent = collapsed ? '\u25BC' : '\u25B6';
+  arrow.textContent = collapsed ? '▼' : '▶';
   savePreset();
 }
 
-function showRemover() {
-  document.getElementById('removeToggle').checked = true;
-  onRemove();
-  document.getElementById('addToggle').checked = false;
-  onAdd();
-  document.getElementById('translateBtn').textContent = '\u2192 Remove Captions';
-  document.getElementById('translateBtn')._mode = 'remove';
+// ══════════════════════════════════════════════
+// CAPTION MODE
+// ══════════════════════════════════════════════
+function setMode(mode) {
+  captionMode = mode;
+  ['single','multi','highlight'].forEach(m => {
+    const el = document.getElementById('mode'+m.charAt(0).toUpperCase()+m.slice(1));
+    if (el) el.classList.toggle('active', m===mode);
+  });
+  document.getElementById('hlColorRow').style.display = mode==='highlight' ? 'flex' : 'none';
+  drawOverlay();
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
-selCanvas.style.pointerEvents = 'none';
+// ══════════════════════════════════════════════
+// PRESET
+// ══════════════════════════════════════════════
+function savePreset() {
+  try {
+    localStorage.setItem('dubshorts_preset', JSON.stringify({
+      yPct:captionYPct, fontFamily:document.getElementById('fontFamily').value,
+      fontSearch:document.getElementById('fontSearch').value, fontSelectedText:document.getElementById('fontSelected').textContent,
+      fontSize:document.getElementById('fontSize').value, textStyle:document.getElementById('textStyle').value,
+      textCase:document.getElementById('textCase').value, textColor:document.getElementById('textColor').value,
+      outlineColor:document.getElementById('outlineColor').value, outlineWidth:document.getElementById('outlineWidth').value,
+      shadowSize:document.getElementById('shadowSize').value, captionMode, highlightColor:document.getElementById('highlightColor').value,
+      language:document.getElementById('langSelect').value,
+      removeCaption:document.getElementById('removeToggle').checked, addCaption:document.getElementById('addToggle').checked,
+      captionBox, stylePanelOpen:document.getElementById('styleInner').style.display!=='none'
+    }));
+  } catch(e) {}
+}
+function loadPreset() {
+  try {
+    const p = JSON.parse(localStorage.getItem('dubshorts_preset')); if (!p) return;
+    if (p.yPct!==undefined){captionYPct=p.yPct;document.getElementById('yPos').value=p.yPct;document.getElementById('yposVal').textContent=p.yPct+'%';}
+    if (p.fontFamily) document.getElementById('fontFamily').value=p.fontFamily;
+    if (p.fontSearch) document.getElementById('fontSearch').value=p.fontSearch;
+    if (p.fontSelectedText) document.getElementById('fontSelected').textContent=p.fontSelectedText;
+    if (p.fontSize){document.getElementById('fontSize').value=p.fontSize;document.getElementById('sizeVal').textContent=p.fontSize+'%';}
+    if (p.textStyle) document.getElementById('textStyle').value=p.textStyle;
+    if (p.textCase) document.getElementById('textCase').value=p.textCase;
+    if (p.textColor) document.getElementById('textColor').value=p.textColor;
+    if (p.outlineColor) document.getElementById('outlineColor').value=p.outlineColor;
+    if (p.outlineWidth){document.getElementById('outlineWidth').value=p.outlineWidth;document.getElementById('outlineVal').textContent=p.outlineWidth+'%';}
+    if (p.shadowSize){document.getElementById('shadowSize').value=p.shadowSize;document.getElementById('shadowVal').textContent=p.shadowSize+'%';}
+    if (p.captionMode) setMode(p.captionMode);
+    if (p.highlightColor) document.getElementById('highlightColor').value=p.highlightColor;
+    if (p.language){document.getElementById('langSelect').value=p.language;updateTranslateBtn();}
+    if (p.removeCaption){document.getElementById('removeToggle').checked=true;onRemove();}
+    if (p.addCaption){document.getElementById('addToggle').checked=true;onAdd();}
+    if (p.captionBox){captionBox=p.captionBox;document.getElementById('clearBtn').style.display='block';drawOverlay();}
+    if (p.stylePanelOpen===false){document.getElementById('styleInner').style.display='none';document.getElementById('styleArrow').textContent='▶';}
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════
+function show(id){document.getElementById(id).style.display='block';}
+function hide(id){document.getElementById(id).style.display='none';}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
 loadPreset();
 updateHint();
 updateTranslateBtn();
-initFontPicker();
-// Only default to Impact if no preset saved
-const _savedPreset = localStorage.getItem('dubshorts_preset');
-const _savedFont = _savedPreset ? JSON.parse(_savedPreset).fontFamily : null;
-const _savedFontName = _savedPreset ? JSON.parse(_savedPreset).fontSearchDisplay : null;
-if (_savedFont && _savedFontName) {
-  selectFont(_savedFont, _savedFontName);
-} else {
-  selectFont('Impact', 'Impact');
-}
+const _sp = localStorage.getItem('dubshorts_preset');
+const _sf = _sp ? JSON.parse(_sp).fontFamily : null;
+const _sn = _sp ? JSON.parse(_sp).fontSearch : null;
+if (_sf && _sn) selectFont(_sf, _sn); else selectFont('Impact','Impact');
 </script>
+</body>
+</html>
