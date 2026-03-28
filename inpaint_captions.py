@@ -15,37 +15,34 @@ def main():
     box = json.loads(box_json)
 
     lama = SimpleLama()
-    cap = cv2.VideoCapture(video_in)
-    fps    = cap.get(cv2.CAP_PROP_FPS)
-    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    WORK_H = 540
-    scale  = WORK_H / height if height > WORK_H else 1.0
-    ww     = int(width  * scale)
-    wh     = int(height * scale)
+    cap          = cv2.VideoCapture(video_in)
+    fps          = cap.get(cv2.CAP_PROP_FPS)
+    width        = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height       = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration     = total_frames / fps if fps > 0 else 0
 
-    pad = 4
-    x1 = max(0, int(box['x'] * ww) - pad)
-    y1 = max(0, int(box['y'] * wh) - pad)
-    x2 = min(ww, int((box['x'] + box['w']) * ww) + pad)
-    y2 = min(wh, int((box['y'] + box['h']) * wh) + pad)
-    bw = x2 - x1
-    bh = y2 - y1
+    print(f"Duration: {duration:.1f}s | source: {width}x{height} | {total_frames} frames", flush=True)
 
-    mask = np.zeros((bh, bw), dtype=np.uint8)
-    mask[pad:bh-pad, pad:bw-pad] = 255
-    mask_pil = Image.fromarray(mask)
+    # Full res box coords — tight, no padding
+    fx1 = max(0,      int(box['x'] * width))
+    fy1 = max(0,      int(box['y'] * height))
+    fx2 = min(width,  int((box['x'] + box['w']) * width))
+    fy2 = min(height, int((box['y'] + box['h']) * height))
+    fw  = fx2 - fx1
+    fh  = fy2 - fy1
 
-    fx1 = max(0, int(box['x'] * width) - pad * 2)
-    fy1 = max(0, int(box['y'] * height) - pad * 2)
-    fx2 = min(width,  int((box['x'] + box['w']) * width)  + pad * 2)
-    fy2 = min(height, int((box['y'] + box['h']) * height) + pad * 2)
+    # Solid white mask — entire box, every frame, no detection
+    full_mask    = np.ones((fh, fw), dtype=np.uint8) * 255
+    mask_pil     = Image.fromarray(full_mask)
+    mask_3ch     = cv2.cvtColor(full_mask, cv2.COLOR_GRAY2BGR)
 
-    ffmpeg = shutil.which('ffmpeg') or '/opt/homebrew/bin/ffmpeg'
+    print(f"Box: x={fx1} y={fy1} w={fw} h={fh} — solid mask, no detection", flush=True)
 
+    ffmpeg_bin = shutil.which('ffmpeg') or '/opt/homebrew/bin/ffmpeg'
     proc = subprocess.Popen([
-        ffmpeg, '-y',
+        ffmpeg_bin, '-y',
         '-f', 'rawvideo', '-vcodec', 'rawvideo',
         '-s', f'{width}x{height}',
         '-pix_fmt', 'bgr24',
@@ -58,30 +55,31 @@ def main():
     ], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
     idx = 0
-    print(f"Processing {width}x{height} @ {fps}fps — LaMa at {ww}x{wh}, crop {bw}x{bh}", flush=True)
-
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-        small = cv2.resize(frame, (ww, wh))
-        crop = small[y1:y2, x1:x2]
-        crop_pil = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+
+        full_crop  = frame[fy1:fy2, fx1:fx2].copy()
+        crop_pil   = Image.fromarray(cv2.cvtColor(full_crop, cv2.COLOR_BGR2RGB))
         result_pil = lama(crop_pil, mask_pil)
         result_bgr = cv2.cvtColor(np.array(result_pil), cv2.COLOR_RGB2BGR)
-        if result_bgr.shape[:2] != (bh, bw):
-            result_bgr = cv2.resize(result_bgr, (bw, bh))
-        small[y1:y2, x1:x2] = result_bgr
-        patch_full = cv2.resize(small[y1:y2, x1:x2], (fx2 - fx1, fy2 - fy1))
-        frame[fy1:fy2, fx1:fx2] = patch_full
+
+        if result_bgr.shape[:2] != (fh, fw):
+            result_bgr = cv2.resize(result_bgr, (fw, fh))
+
+        frame[fy1:fy2, fx1:fx2] = result_bgr
+
         try:
             proc.stdin.write(frame.tobytes())
         except BrokenPipeError:
-            print(f"Pipe closed at frame {idx} — FFmpeg done early", flush=True)
+            print(f"Pipe closed at frame {idx}", flush=True)
             break
+
         idx += 1
         if idx % 30 == 0:
-            print(f"  {idx} frames done", flush=True)
+            pct = int(idx / max(total_frames, 1) * 100)
+            print(f"  [{pct}%] {idx}/{total_frames}", flush=True)
 
     cap.release()
     try:
@@ -90,12 +88,11 @@ def main():
         pass
     proc.wait()
 
-    # Check output file exists and has real content
     if os.path.exists(video_out) and os.path.getsize(video_out) > 10000:
-        print(f"Done — {idx} frames → {video_out}", flush=True)
+        print(f"Done — {idx} frames processed", flush=True)
     else:
-        stderr = proc.stderr.read().decode(errors='replace')
-        raise RuntimeError(f'FFmpeg failed (rc={proc.returncode}): {stderr[-600:]}')
+        stderr_out = proc.stderr.read().decode(errors='replace')
+        raise RuntimeError(f'FFmpeg failed (rc={proc.returncode}): {stderr_out[-600:]}')
 
 if __name__ == '__main__':
     main()

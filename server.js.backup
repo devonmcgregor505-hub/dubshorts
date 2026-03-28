@@ -1,4 +1,3 @@
-const { MultiSpeakerDubber } = require("./multi_speaker_dub");
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
@@ -9,38 +8,8 @@ const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-
-const r2 = new S3Client({
-  region: 'auto',
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-  },
-});
-
-async function uploadToR2(filePath, key) {
-  const fileBuffer = fs.readFileSync(filePath);
-  await r2.send(new PutObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME,
-    Key: key,
-    Body: fileBuffer,
-    ContentType: 'video/mp4',
-  }));
-  const url = `https://pub-c068534d6a23426592ffab06501be7a4.r2.dev/${key}`;
-  console.log('Uploaded to R2:', key);
-  return url;
-}
 
 const ffmpegStatic = require('ffmpeg-static');
-const { createCanvas, loadImage, registerFont } = require('canvas');
-
-const fontPath = path.join(__dirname, 'DejaVuSans-Bold.ttf');
-if (fs.existsSync(fontPath)) {
-  registerFont(fontPath, { family: 'CaptionFont', weight: 'bold' });
-  console.log('Font registered:', fontPath);
-}
 
 let FFMPEG_PATH = ffmpegStatic;
 try {
@@ -55,8 +24,10 @@ function runFFmpeg(args, timeout = 180000) {
 }
 
 const app = express();
+app.use((req, res, next) => { req.setTimeout(0); res.setTimeout(0); next(); });
 const PORT = process.env.PORT || 3000;
 app.use(cors());
+app.use(express.static(__dirname));
 app.use(express.json());
 app.use('/outputs', express.static('outputs'));
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 200 * 1024 * 1024 } });
@@ -73,7 +44,6 @@ app.get('/clear-cache', (req, res) => {
   } catch(e) { res.send('Cache clear error: ' + e.message); }
 });
 
-// ── QUEUE ─────────────────────────────────────────────────────────────────────
 const queue = [];
 let activeJobs = 0;
 const MAX_CONCURRENT = 8;
@@ -92,9 +62,8 @@ async function processQueue() {
   try { resolve(await job()); } catch(e) { reject(e); } finally { activeJobs--; processQueue(); }
 }
 
-// ── CACHE ─────────────────────────────────────────────────────────────────────
-function getCacheKey(fileBuffer, lang, provider) {
-  return crypto.createHash('md5').update(fileBuffer).update(lang).update(provider).digest('hex');
+function getCacheKey(fileBuffer, lang) {
+  return crypto.createHash('md5').update(fileBuffer).update(lang).update('elevenlabs').digest('hex');
 }
 function getCachedResult(key) {
   const p = path.join('cache', key + '.mp4');
@@ -104,414 +73,282 @@ function setCachedResult(key, outputPath) {
   try { fs.copyFileSync(outputPath, path.join('cache', key + '.mp4')); } catch(e) {}
 }
 
-// ── MODELSLAB DUBBING ─────────────────────────────────────────────────────────
-async function dubWithModelsLab(videoUrl, targetLang) {
-  // Force multi-speaker mode
-  const useMultiSpeaker = true;  // Enable multi-speaker
-  const detectedSpeakers = 2;     // Your video has 2 speakers
-  const langMap = {
-    es: 'es', hi: 'hi', pt: 'pt-br', ja: 'ja', fr: 'fr', pl: 'pl',
-    it: 'it', zh: 'zh', 'en-us': 'en-us', 'en-gb': 'en-gb', en: 'en-us'
-  };
-  const lang = langMap[targetLang] || targetLang;
+const ELEVEN_LANG_MAP = { es:'es', hi:'hi', pt:'pt', ja:'ja', fr:'fr', pl:'pl', it:'it', zh:'zh', en:'en' };
 
-  const dubRes = await axios.post('https://modelslab.com/api/v6/voice/create_dubbing', {
-    key: process.env.MODELSLAB_API_KEY,
-    init_video: videoUrl,
-    source_lang: 'en',
-    output_lang: lang,
-    speed: 1.0,
-    num_speakers: 0,
-    file_prefix: 'dub_' + lang + '_' + Date.now() + '_' + Math.random().toString(36).slice(2),
-    base64: false, webhook: null, track_id: null
-  }, { headers: { 'Content-Type': 'application/json' }, timeout: 120000 });
+async function dubWithElevenLabs(videoPath, targetLang) {
+  const lang = ELEVEN_LANG_MAP[targetLang] || targetLang;
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error('ELEVENLABS_API_KEY not set');
 
-  console.log('ModelsLab response:', JSON.stringify(dubRes.data).slice(0, 300));
+  console.log('ElevenLabs: submitting dub job ->', lang);
+  const form = new FormData();
+  form.append('file', fs.createReadStream(videoPath), { filename: 'input.mp4', contentType: 'video/mp4' });
+  form.append('target_lang', lang);
+  form.append('source_lang', 'en');
+  form.append('num_speakers', '0');
+  form.append('watermark', 'true');
 
-  if (dubRes.data.status === 'success' && dubRes.data.output?.[0]) {
-    const dlRes = await axios.get(dubRes.data.output[0], { responseType: 'arraybuffer', timeout: 120000 });
-    return dlRes.data;
+  const submitRes = await axios.post('https://api.elevenlabs.io/v1/dubbing', form, {
+    headers: { 'xi-api-key': apiKey, ...form.getHeaders() },
+    timeout: 120000, maxContentLength: Infinity, maxBodyLength: Infinity,
+  });
+
+  const dubbingId = submitRes.data.dubbing_id;
+  const expectedDuration = submitRes.data.expected_duration_sec || 300;
+  if (!dubbingId) throw new Error('ElevenLabs: no dubbing_id — ' + JSON.stringify(submitRes.data).slice(0, 200));
+  console.log('ElevenLabs: job submitted. id=' + dubbingId + ' expected=' + expectedDuration + 's');
+
+  const maxAttempts = Math.ceil((expectedDuration * 3 * 1000) / 5000) + 20;
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    const statusRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId, {
+      headers: { 'xi-api-key': apiKey }, timeout: 15000,
+    });
+    const { status, error } = statusRes.data;
+    console.log('Poll ' + (i+1) + '/' + maxAttempts + ': ' + status);
+    if (status === 'dubbed') break;
+    if (status === 'failed') throw new Error('ElevenLabs dubbing failed: ' + (error || 'unknown'));
   }
 
-  if (dubRes.data.status === 'processing' && dubRes.data.fetch_result) {
-    for (let attempts = 0; attempts < 180; attempts++) {
-      await new Promise(r => setTimeout(r, 5000));
-      const poll = await axios.post(dubRes.data.fetch_result, { key: process.env.MODELSLAB_API_KEY }, {
-        headers: { 'Content-Type': 'application/json' }, timeout: 30000
-      });
-      console.log(`Poll ${attempts + 1}: ${poll.data.status}`);
-      if (poll.data.status === 'success' && poll.data.output?.[0]) {
-        const dlRes = await axios.get(poll.data.output[0], { responseType: 'arraybuffer', timeout: 120000 });
-        return dlRes.data;
-      }
-      if (poll.data.status === 'failed') {
-        throw new Error('ModelsLab dubbing failed: ' + JSON.stringify(poll.data).slice(0, 200));
-      }
-    }
-  }
-  throw new Error('ModelsLab dubbing failed or timed out: ' + JSON.stringify(dubRes.data).slice(0, 200));
+  console.log('ElevenLabs: downloading result...');
+  const downloadRes = await axios.get('https://api.elevenlabs.io/v1/dubbing/' + dubbingId + '/audio/' + lang, {
+    headers: { 'xi-api-key': apiKey },
+    responseType: 'arraybuffer',
+    timeout: 120000,
+  });
+
+  return { data: downloadRes.data, dubbingId };
 }
 
-// ── CAPTIONS ──────────────────────────────────────────────────────────────────
-async function burnCaptionsOnFrames(framesDir, cues, vidW, vidH, fps, style) {
-  style = style || {};
-  const yPct = (style.yPct !== undefined ? style.yPct : 75) / 100;
-  const fontSizePct = (style.fontSize || 5) / 100;
-  const fontSize = Math.max(10, Math.round(vidH * fontSizePct));
-  const fontFamily = style.fontFamily || (fs.existsSync(fontPath) ? 'CaptionFont' : 'sans-serif');
-  const textStyle = style.textStyle || 'bold';
-  const textColor = style.textColor || '#ffffff';
-  const outlineColor = style.outlineColor || '#000000';
-  const outlineWidthPct = (style.outlineWidth || 15) / 100;
-  const textCase = style.textCase || 'upper';
-  const shadowSize = style.shadowSize || 0;
-  const captionMode = style.captionMode || 'single';
-  const highlightColor = style.highlightColor || '#f5e132';
-
-  const frames = fs.readdirSync(framesDir).filter(f => f.endsWith('.jpg')).sort();
-  console.log(`Burning captions: ${frames.length} frames, ${fontSize}px, y=${Math.round(yPct * 100)}%`);
-
-  function getChunkAtTime(t) {
-    if (captionMode === 'single') {
-      const cue = cues.find(c => t >= c.start && t < c.end);
-      return cue ? { words: [{ text: cue.text, highlight: true }] } : null;
-    }
-    const idx = cues.findIndex(c => t >= c.start && t < c.end);
-    if (idx < 0) return null;
-    return buildChunk(idx);
-  }
-
-  function buildChunk(activeIdx) {
-    const lines = [];
-    let i = 0;
-    let activeLine = 0;
-    while (i < cues.length) {
-      const line = [];
-      let charCount = 0;
-      while (i < cues.length) {
-        const word = cues[i];
-        const wordLen = word.text.length;
-        if (line.length > 0 && charCount + 1 + wordLen > 15) break;
-        line.push({ text: word.text, highlight: i === activeIdx, start: word.start, end: word.end });
-        charCount += (line.length === 1 ? 0 : 1) + wordLen;
-        if (i === activeIdx) activeLine = lines.length;
-        i++;
-      }
-      lines.push(line);
-    }
-    return { words: lines[activeLine] || [] };
-  }
-
-  for (let i = 0; i < frames.length; i++) {
-    const t = i / fps;
-    const chunk = getChunkAtTime(t);
-    if (!chunk) continue;
-
-    const framePath = path.join(framesDir, frames[i]);
-    const img = await loadImage(framePath);
-    const canvas = createCanvas(vidW, vidH);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, vidW, vidH);
-
-    const x = vidW / 2;
-    const y = yPct * vidH;
-    ctx.font = `${textStyle} ${fontSize}px ${fontFamily}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    if (captionMode === 'single') {
-      let txt = chunk.words[0].text;
-      if (textCase === 'upper') txt = txt.toUpperCase();
-      else if (textCase === 'lower') txt = txt.toLowerCase();
-      if (shadowSize > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadowSize * fontSize; ctx.shadowOffsetY = shadowSize * fontSize * 0.3; }
-      if (outlineWidthPct > 0) { ctx.lineWidth = fontSize * outlineWidthPct; ctx.strokeStyle = outlineColor; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); }
-      ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      ctx.fillStyle = textColor; ctx.fillText(txt, x, y);
-    } else {
-      const words = chunk.words.map(w => {
-        let txt = w.text;
-        if (textCase === 'upper') txt = txt.toUpperCase();
-        else if (textCase === 'lower') txt = txt.toLowerCase();
-        return { ...w, txt };
-      });
-      const wordWidths = words.map(w => ctx.measureText(w.txt + ' ').width);
-      const lines = [];
-      let currentLine = [], currentW = 0;
-      words.forEach((w, i) => {
-        if (currentW + wordWidths[i] > vidW * 0.85 && currentLine.length > 0) {
-          lines.push(currentLine); currentLine = [w]; currentW = wordWidths[i];
-        } else { currentLine.push(w); currentW += wordWidths[i]; }
-      });
-      if (currentLine.length) lines.push(currentLine);
-      const lineH = fontSize * 1.3;
-      const startY = y - ((lines.length - 1) * lineH) / 2;
-      lines.forEach((line, li) => {
-        const lineW = line.reduce((acc, w) => acc + ctx.measureText(w.txt + ' ').width, 0);
-        let curX = vidW / 2 - lineW / 2;
-        const lineY = startY + li * lineH;
-        line.forEach(w => {
-          const ww = ctx.measureText(w.txt + ' ').width;
-          const cx = curX + ww / 2 - ctx.measureText(' ').width / 2;
-          const color = (captionMode === 'highlight' && w.highlight) ? highlightColor : textColor;
-          if (shadowSize > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadowSize * fontSize; ctx.shadowOffsetY = shadowSize * fontSize * 0.3; }
-          if (outlineWidthPct > 0) { ctx.lineWidth = fontSize * outlineWidthPct; ctx.strokeStyle = outlineColor; ctx.lineJoin = 'round'; ctx.strokeText(w.txt, cx, lineY); }
-          ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-          ctx.fillStyle = color; ctx.fillText(w.txt, cx, lineY);
-          curX += ww;
-        });
-      });
-    }
-    fs.writeFileSync(framePath, canvas.toBuffer('image/jpeg', { quality: 0.92 }));
-    canvas.width = 0; canvas.height = 0;
-    if (i % 30 === 0) { console.log(`Captioned ${i}/${frames.length}`); await new Promise(r => setTimeout(r, 1)); }
-  }
-  console.log('All frames captioned!');
-}
-
-// ── MAIN ROUTE ────────────────────────────────────────────────────────────────
-app.post('/translate', upload.single('video'), async (req, res) => {
+app.post('/dub-speakers', upload.single('video'), async (req, res) => {
   const videoPath = path.resolve(req.file.path);
   const timestamp = Date.now();
-  const audioPath = path.resolve('uploads/dubbed_audio_' + timestamp + '.mp3');
-  const dubbedVideoPath = path.resolve('uploads/dubbed_video_' + timestamp + '.mp4');
-  const framesDir = path.resolve('uploads/frames_' + timestamp);
-  const captionedPath = path.resolve('uploads/captioned_' + timestamp + '.mp4');
-  const outputPath = path.resolve('outputs/final_' + timestamp + '.mp4');
-  const allFiles = [videoPath, audioPath, dubbedVideoPath, captionedPath, path.resolve('uploads/raw_inpaint_' + timestamp + '.mp4')];
-
-  console.log('File received:', req.file.originalname);
-
-  let captionBox = null;
-  if (req.body.captionBox) { try { captionBox = JSON.parse(req.body.captionBox); } catch(e) {} }
-  let captionStyle = null;
-  if (req.body.captionStyle) { try { captionStyle = JSON.parse(req.body.captionStyle); } catch(e) {} }
-  const provider = req.body.provider || 'modelslab';
   const targetLang = req.body.language || 'es';
+  const outputPath = path.resolve('outputs/final_dubbed_' + timestamp + '.mp4');
 
-  // Cache check
   const fileBuffer = fs.readFileSync(videoPath);
-  const cacheKey = getCacheKey(fileBuffer, targetLang, provider);
+  const cacheKey = getCacheKey(fileBuffer, targetLang);
   const cached = getCachedResult(cacheKey);
   if (cached) {
     console.log('Cache hit!');
-    const cachedOut = path.resolve('outputs/final_' + timestamp + '.mp4');
-    fs.copyFileSync(cached, cachedOut);
-    setTimeout(() => { try { if (fs.existsSync(cachedOut)) fs.unlinkSync(cachedOut); } catch(e) {} }, 600000);
-    return res.json({ success: true, videoUrl: '/outputs/final_' + timestamp + '.mp4', cached: true });
+    fs.copyFileSync(cached, outputPath);
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+    return res.json({ success: true, videoUrl: '/outputs/final_dubbed_' + timestamp + '.mp4', cached: true });
   }
+
+  const removeCaption = req.body.removeCaption === 'true';
+  const captionBox = req.body.captionBox ? JSON.parse(req.body.captionBox) : null;
 
   try {
     const result = await enqueue(async () => {
-      let vidW = 1080, vidH = 1920, fps = 24;
-      try {
-        const probe = spawnSync(FFMPEG_PATH, ['-i', videoPath], { encoding: 'utf8' });
-        const dim = (probe.stderr || '').match(/(\d{3,4})x(\d{3,4})/);
-        const fpsM = (probe.stderr || '').match(/(\d+(?:\.\d+)?) fps/);
-        if (dim) { vidW = parseInt(dim[1]); vidH = parseInt(dim[2]); }
-        if (fpsM) fps = Math.min(parseFloat(fpsM[1]), 24);
-        const durCheck = (probe.stderr || '').match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
-        if (durCheck) {
-          const durSecs = parseInt(durCheck[1]) * 3600 + parseInt(durCheck[2]) * 60 + parseFloat(durCheck[3]);
-          if (durSecs > 120) throw new Error('Video must be under 2 minutes');
-        }
-        console.log('Video:', vidW, 'x', vidH, '@', fps, 'fps');
-      } catch(e) { if (e.message.includes('under 2 minutes')) throw e; }
-
-      // Caption removal
-      let cleanVideoPath = videoPath;
-      if (captionBox && req.body.removeCaption === 'true') {
-        console.log('OpenCV caption removal...');
-        const { x, y, w, h } = captionBox;
-        const cleanPath = path.resolve('uploads/clean_' + timestamp + '.mp4');
-        const rawInpaintPath = path.resolve('uploads/raw_inpaint_' + timestamp + '.mp4');
-        const inpaintResult = spawnSync('python3', [
-          path.join(__dirname, 'inpaint.py'),
-          videoPath, rawInpaintPath,
-          String(x), String(y), String(w), String(h)
-        ], { encoding: 'utf8', timeout: 1200000, maxBuffer: 100 * 1024 * 1024 });
-        console.log('Inpaint stdout:', inpaintResult.stdout?.slice(-300) || 'EMPTY');
-        if (inpaintResult.status !== 0 || !fs.existsSync(rawInpaintPath)) {
-          console.log('Inpaint failed, using original');
-        } else {
-          runFFmpeg(['-y', '-i', rawInpaintPath, '-i', videoPath, '-map', '0:v', '-map', '1:a?', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-c:a', 'aac', '-shortest', cleanPath], 120000);
-          try { fs.unlinkSync(rawInpaintPath); } catch(e) {}
-          cleanVideoPath = cleanPath;
-          console.log('Caption removal done!');
-        }
+      let activeVideoPath = videoPath;
+      if (removeCaption && captionBox) {
+        console.log('Step 0: Removing captions via LaMa...');
+        const inpaintDir = path.resolve('outputs/inpaint_' + timestamp);
+        fs.mkdirSync(inpaintDir, { recursive: true });
+        const inpainted540 = path.resolve(inpaintDir, 'inpainted_540.mp4');
+        const inpaintedFinal = path.resolve(inpaintDir, 'inpainted_final.mp4');
+        runInpaint(videoPath, inpainted540, captionBox);
+        runFFmpeg([
+          '-y', '-i', inpainted540, '-i', videoPath,
+          '-map', '0:v:0', '-map', '1:a:0',
+          '-vf', 'scale=1080:-2',
+          '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+          '-c:a', 'aac', '-shortest', inpaintedFinal,
+        ], 300000);
+        activeVideoPath = inpaintedFinal;
       }
 
-      // Dub via ModelsLab using R2 upload
       if (targetLang === 'none') {
-        fs.copyFileSync(cleanVideoPath, dubbedVideoPath);
-        console.log('No translation selected');
+        runFFmpeg(['-y', '-i', activeVideoPath, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-c:a', 'aac', outputPath], 180000);
       } else {
-        console.log('Uploading to R2 for ModelsLab...');
-        const r2Key = 'dub_input_' + timestamp + '.mp4';
-        const videoUrl = await uploadToR2(cleanVideoPath, r2Key);
-        console.log('R2 URL:', videoUrl);
-        const videoData = await dubWithModelsLab(videoUrl, targetLang);
-        fs.writeFileSync(dubbedVideoPath, videoData);
-        console.log('ModelsLab dubbing complete!');
+        const { data: videoData } = await dubWithElevenLabs(activeVideoPath, targetLang);
+        const rawDubPath = path.resolve('uploads/raw_dub_' + timestamp + '.bin');
+        fs.writeFileSync(rawDubPath, videoData);
+        console.log('Raw dub size:', fs.statSync(rawDubPath).size, 'bytes');
+        runFFmpeg([
+          '-y', '-i', activeVideoPath, '-i', rawDubPath,
+          '-map', '0:v:0', '-map', '1:a:0',
+          '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+          '-c:a', 'aac', '-ac', '2', '-shortest',
+          outputPath,
+        ], 180000);
+        try { fs.unlinkSync(rawDubPath); } catch(e) {}
       }
 
-      // VIDEO SOURCE
-      const dubbingRan = targetLang !== 'none' && fs.existsSync(dubbedVideoPath) && fs.statSync(dubbedVideoPath).size > 1000;
-      const videoSource = dubbingRan ? dubbedVideoPath : cleanVideoPath;
-      console.log('videoSource:', dubbingRan ? 'dubbed' : 'clean', fs.existsSync(videoSource) ? fs.statSync(videoSource).size + 'b' : 'MISSING');
-      let videoForMerge = videoSource;
-
-      // AssemblyAI transcription for captions
-      let cues = [];
-      if (req.body.addCaption === 'true') {
-        try {
-          console.log('AAI key:', !!process.env.ASSEMBLYAI_API_KEY);
-          console.log('Extracting audio for AssemblyAI...');
-          const aaiAudioPath = path.resolve('uploads/aai_audio_' + timestamp + '.mp3');
-          runFFmpeg(['-y', '-i', videoSource, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'mp3', aaiAudioPath], 60000);
-
-          const audioBuffer = fs.readFileSync(aaiAudioPath);
-          const uploadRes = await axios.post('https://api.assemblyai.com/v2/upload', audioBuffer, {
-            headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY, 'content-type': 'application/octet-stream' },
-            timeout: 60000
+      const addCaption = req.body.addCaption === 'true';
+      const captionStyle = req.body.captionStyle ? JSON.parse(req.body.captionStyle) : {};
+      if (addCaption && process.env.ASSEMBLYAI_API_KEY) {
+        console.log('Step: Transcribing dubbed audio with AssemblyAI...');
+        const audioPath = path.resolve('uploads/dub_audio_' + timestamp + '.mp3');
+        runFFmpeg(['-y', '-i', outputPath, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'mp3', audioPath], 60000);
+        const audioBuffer = fs.readFileSync(audioPath);
+        const uploadRes = await axios.post('https://api.assemblyai.com/v2/upload', audioBuffer, {
+          headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY, 'content-type': 'application/octet-stream' }, timeout: 60000
+        });
+        const jobRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
+          audio_url: uploadRes.data.upload_url, punctuate: true, speech_models: ['universal-2']
+        }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
+        let words = [];
+        for (let i = 0; i < 60; i++) {
+          await new Promise(r => setTimeout(r, 3000));
+          const poll = await axios.get('https://api.assemblyai.com/v2/transcript/' + jobRes.data.id, {
+            headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 15000
           });
-          console.log('Audio uploaded to AssemblyAI');
-          try { fs.unlinkSync(aaiAudioPath); } catch(e) {}
-
-          const transcriptRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
-            audio_url: uploadRes.data.upload_url,
-            speech_models: ['universal-2'],
-          }, {
-            headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY },
-            timeout: 30000
+          if (poll.data.status === 'completed') { words = poll.data.words || []; break; }
+          if (poll.data.status === 'error') throw new Error('AssemblyAI: ' + poll.data.error);
+        }
+        try { fs.unlinkSync(audioPath); } catch(e) {}
+        if (words.length > 0) {
+          console.log('Step: Burning ' + words.length + ' words onto video...');
+          const wordsForPy = words.map(w => ({ text: w.text, start: w.start / 1000, end: w.end / 1000 }));
+          const captionOutput = path.resolve('outputs/captioned_' + timestamp + '.mp4');
+          const python = path.join(__dirname, 'venv/bin/python');
+          const script = path.join(__dirname, 'burn_captions.py');
+          const burnResult = spawnSync(python, [script, outputPath, captionOutput, JSON.stringify(wordsForPy), JSON.stringify(captionStyle)], {
+            timeout: 900000, maxBuffer: 100 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe']
           });
-
-          const transcriptId = transcriptRes.data.id;
-          console.log('AssemblyAI job:', transcriptId);
-
-          for (let i = 0; i < 60; i++) {
-            await new Promise(r => setTimeout(r, 2000));
-            const pollRes = await axios.get('https://api.assemblyai.com/v2/transcript/' + transcriptId, {
-              headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 15000
-            });
-            console.log('AssemblyAI poll', i + 1, ':', pollRes.data.status);
-            if (pollRes.data.status === 'completed') {
-              const rawWords = pollRes.data.words || [];
-              cues = rawWords.map((w, i) => ({
-                start: w.start / 1000,
-                end: rawWords[i + 1] ? rawWords[i + 1].start / 1000 : w.end / 1000 + 0.5,
-                text: w.text
-              }));
-              console.log('AssemblyAI done,', cues.length, 'word cues');
-              break;
-            } else if (pollRes.data.status === 'error') {
-              console.log('AssemblyAI error:', pollRes.data.error);
-              break;
-            }
+          const burnOut = (burnResult.stdout || '').toString();
+          const burnErr = (burnResult.stderr || '').toString();
+          if (burnOut) console.log('[captions]', burnOut.trim());
+          if (burnResult.status === 0 && fs.existsSync(captionOutput) && fs.statSync(captionOutput).size > 10000) {
+            const captionWithAudio = path.resolve('outputs/captioned_audio_' + timestamp + '.mp4');
+            runFFmpeg([
+              '-y', '-i', captionOutput, '-i', outputPath,
+              '-map', '0:v:0', '-map', '1:a:0',
+              '-c:v', 'copy', '-c:a', 'aac', '-shortest',
+              captionWithAudio
+            ], 120000);
+            fs.copyFileSync(captionWithAudio, outputPath);
+            try { fs.unlinkSync(captionOutput); } catch(e) {}
+            try { fs.unlinkSync(captionWithAudio); } catch(e) {}
+            console.log('Captions burned successfully');
+          } else {
+            console.error('Caption burn failed:', burnErr.slice(-300));
           }
-        } catch(e) {
-          console.log('Caption generation failed:', e.message);
-          if (e.response) console.log('AAI error body:', JSON.stringify(e.response.data).slice(0, 300));
         }
       }
 
-      // Burn captions
-      console.log('captionStyle:', JSON.stringify(captionStyle));
-      console.log('cues.length:', cues.length);
-      if (cues.length > 0) {
-        console.log('Burning captions with Python...');
-        const burnH = Math.min(vidH, 720);
-        const burnW = Math.round(vidW * burnH / vidH) & ~1;
-        const scaledForBurn = path.resolve('uploads/scaled_' + timestamp + '.mp4');
-        const burnStyle = {
-    yPct: captionStyle?.yPct ?? 70,
-    fontSize: captionStyle?.fontSize ?? 4,
-    textColor: captionStyle?.textColor ?? '#ffffff',
-    outlineColor: captionStyle?.outlineColor ?? '#000000',
-    outlineWidth: captionStyle?.outlineWidth ?? 15,
-    textStyle: captionStyle?.textStyle ?? 'bold',
-    textCase: captionStyle?.textCase ?? 'upper',
-    captionMode: captionStyle?.captionMode ?? 'single',
-    highlightColor: captionStyle?.highlightColor ?? '#f5e132',
-    shadowSize: captionStyle?.shadowSize ?? 0
-  };
-        runFFmpeg(['-y', '-i', videoSource, '-vf', `scale=${burnW}:${burnH}`, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', scaledForBurn], 120000);
-        const burnSource = fs.existsSync(scaledForBurn) ? scaledForBurn : videoSource;
-        const pyResult = spawnSync('python3', [
-          path.join(__dirname, 'burn_captions.py'),
-          burnSource, captionedPath,
-          JSON.stringify(cues), JSON.stringify(burnStyle)
-        ], { encoding: 'utf8', timeout: 600000, maxBuffer: 100 * 1024 * 1024 });
-        try { fs.unlinkSync(scaledForBurn); } catch(e) {}
-        console.log('Python stdout:', pyResult.stdout?.slice(-300));
-        if (pyResult.stderr) console.log('Python stderr:', pyResult.stderr?.slice(-200));
-        if (pyResult.status === 0 && fs.existsSync(captionedPath)) {
-          if (burnH < vidH) {
-            const upscaledPath = path.resolve('uploads/upscaled_' + timestamp + '.mp4');
-            runFFmpeg(['-y', '-i', captionedPath, '-vf', `scale=${vidW}:${vidH}`, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', upscaledPath], 120000);
-            if (fs.existsSync(upscaledPath)) {
-              try { fs.unlinkSync(captionedPath); } catch(e) {}
-              fs.renameSync(upscaledPath, captionedPath);
-            }
-          }
-          videoForMerge = captionedPath;
-          console.log('Captions burned!');
-        } else {
-          console.log('Caption burning failed, skipping captions');
-        }
-      }
-
-      // Final merge
-      console.log('Final merge...');
-      if (targetLang === 'none') {
-        runFFmpeg(['-y', '-i', videoForMerge, '-i', videoPath, '-map', '0:v', '-map', '1:a?', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-c:a', 'aac', '-shortest', outputPath], 180000);
-      } else {
-        // Put dubbed audio over original video (keeps original video quality, no glitching)
-        runFFmpeg(['-y', '-i', videoForMerge, '-i', dubbedVideoPath, '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-c:a', 'aac', '-shortest', outputPath], 180000);
-      }
-
-      const outSize = fs.existsSync(outputPath) ? fs.statSync(outputPath).size : 0;
-      console.log('Done! Output size:', outSize, 'bytes');
-
+      console.log('Done! Output:', fs.statSync(outputPath).size, 'bytes');
       setCachedResult(cacheKey, outputPath);
-      allFiles.forEach(f => { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch(e) {} });
-      setTimeout(() => { try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch(e) {} }, 600000);
-      return { success: true, videoUrl: '/outputs/final_' + timestamp + '.mp4' };
+      try { fs.unlinkSync(videoPath); } catch(e) {}
+      setTimeout(() => { try { fs.unlinkSync(outputPath); } catch(e) {} }, 600000);
+      return { success: true, videoUrl: '/outputs/final_dubbed_' + timestamp + '.mp4' };
     });
 
     res.json(result);
   } catch(err) {
-    console.error('Error:', err.message);
-    if (err.response) console.error('API error:', JSON.stringify(err.response.data).slice(0, 300));
-    allFiles.concat([outputPath]).forEach(f => { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch(e) {} });
-    try { if (fs.existsSync(framesDir)) { fs.readdirSync(framesDir).forEach(f => fs.unlinkSync(path.join(framesDir, f))); fs.rmdirSync(framesDir); } } catch(e) {}
+    console.error('dub-speakers error:', err.message);
+    if (err.response) console.error('API response:', JSON.stringify(err.response.data).slice(0, 300));
+    try { fs.unlinkSync(videoPath); } catch(e) {}
     res.status(500).json({ success: false, error: err.message });
   }
-});
-
-// ── SETTINGS ──────────────────────────────────────────────────────────────────
-const SETTINGS_FILE = path.resolve('settings.json');
-app.get('/settings', (req, res) => {
-  try {
-    if (fs.existsSync(SETTINGS_FILE)) res.json(JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')));
-    else res.json({});
-  } catch(e) { res.json({}); }
-});
-app.post('/settings', express.json(), (req, res) => {
-  try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(req.body, null, 2)); res.json({ ok: true }); }
-  catch(e) { res.status(500).json({ ok: false }); }
 });
 
 app.get('/queue', (req, res) => {
   res.json({ active: activeJobs, waiting: queue.length, max: MAX_CONCURRENT });
 });
 
-app.get('/test-audio', (req, res) => {
-  const files = fs.readdirSync('uploads').filter(f => f.startsWith('dubbed_audio'));
-  if (files.length === 0) return res.send('no audio files');
-  const latest = files.sort().pop();
-  res.setHeader('Content-Type', 'audio/mpeg');
-  fs.createReadStream('uploads/' + latest).pipe(res);
+app.post('/remove-captions', upload.single('video'), async (req, res) => {
+  const videoPath = path.resolve(req.file.path);
+  const timestamp = Date.now();
+  const box = JSON.parse(req.body.captionBox || '{}');
+  if (!box.x && box.x !== 0) return res.status(400).json({ success: false, error: 'No captionBox provided' });
+
+  const workDir = path.resolve('outputs/inpaint_' + timestamp);
+  fs.mkdirSync(workDir, { recursive: true });
+
+  const inpainted540 = path.resolve(workDir, 'inpainted_540.mp4');
+  const outputPath   = path.resolve('outputs/clean_' + timestamp + '.mp4');
+
+  try {
+    await enqueue(async () => {
+      console.log('Step 1: Inpainting captions...');
+      runInpaint(videoPath, inpainted540, box);
+
+      console.log('Step 2: Upscaling to 1080p + merging original audio...');
+      runFFmpeg([
+        '-y',
+        '-i', inpainted540,
+        '-i', videoPath,
+        '-map', '0:v:0',
+        '-map', '1:a:0',
+        '-vf', 'scale=1080:-2',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+        '-c:a', 'aac', '-ac', '2',
+        '-shortest',
+        outputPath,
+      ], 300000);
+
+      try { fs.unlinkSync(videoPath); } catch(e) {}
+      try { fs.rmSync(workDir, { recursive: true, force: true }); } catch(e) {}
+      setTimeout(() => { try { fs.unlinkSync(outputPath); } catch(e) {} }, 600000);
+    });
+
+    res.json({ success: true, videoUrl: '/outputs/clean_' + timestamp + '.mp4' });
+  } catch(err) {
+    console.error('remove-captions error:', err.message);
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+    try { fs.rmSync(workDir, { recursive: true, force: true }); } catch(e) {}
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
+
+app.post('/remove-captions-fast', upload.single('video'), async (req, res) => {
+  const videoPath = path.resolve(req.file.path);
+  const timestamp = Date.now();
+  const box = JSON.parse(req.body.captionBox || '{}');
+  if (box.x === undefined) return res.status(400).json({ success: false, error: 'No captionBox' });
+
+  const outputPath = path.resolve('outputs/clean_fast_' + timestamp + '.mp4');
+
+  try {
+    await enqueue(async () => {
+      const probe = spawnSync(FFMPEG_PATH, ['-i', videoPath], { encoding: 'utf8' });
+      const dimMatch = (probe.stderr || '').match(/(\d{3,5})x(\d{3,5})/);
+      const W = dimMatch ? parseInt(dimMatch[1]) : 1080;
+      const H = dimMatch ? parseInt(dimMatch[2]) : 1920;
+
+      const bx = Math.round(box.x * W);
+      const by = Math.round(box.y * H);
+      const bw = Math.round(box.w * W);
+      const bh = Math.round(box.h * H);
+
+      runFFmpeg([
+        '-y', '-i', videoPath,
+        '-vf', `delogo=x=${bx}:y=${by}:w=${bw}:h=${bh}:show=0`,
+        '-c:v', 'libx264', '-preset', 'fast', '-crf', '22',
+        '-c:a', 'aac',
+        outputPath,
+      ], 180000);
+
+      try { fs.unlinkSync(videoPath); } catch(e) {}
+      setTimeout(() => { try { fs.unlinkSync(outputPath); } catch(e) {} }, 600000);
+    });
+
+    res.json({ success: true, videoUrl: '/outputs/clean_fast_' + timestamp + '.mp4' });
+  } catch(err) {
+    console.error('remove-captions-fast error:', err.message);
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── LaMa inpaint with smart text masking ─────────────────────────────────────
+function runInpaint(videoIn, videoOut, box) {
+  const python = path.join(__dirname, 'venv/bin/python');
+  const script = path.join(__dirname, 'inpaint_captions.py');
+  console.log('Running LaMa inpaint...');
+  const result = spawnSync(python, [script, videoIn, videoOut, JSON.stringify(box)], {
+    timeout: 600000,
+    maxBuffer: 100 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const out = (result.stdout || '').toString();
+  const err = (result.stderr || '').toString();
+  if (out) console.log('[lama]', out.trim());
+  if (result.status !== 0) throw new Error('Inpaint failed: ' + err.slice(-400));
+}
 
 app.listen(PORT, () => { console.log('DubShorts running at http://localhost:' + PORT); });
 
@@ -519,44 +356,3 @@ process.on('uncaughtException', (err) => {
   if (err.code === 'EPIPE') return;
   console.error('Uncaught exception:', err.message);
 });
-
-// Add multi-speaker dubbing function
-async function dubWithMultiSpeaker(videoPath, targetLang) {
-  console.log('\n🎯 USING MULTI-SPEAKER DUBBING SYSTEM');
-  
-  const dubber = new MultiSpeakerDubber(
-    process.env.ASSEMBLYAI_API_KEY,
-    process.env.MODELSLAB_API_KEY
-  );
-  
-  try {
-    const dubbedVideo = await dubber.process(videoPath, targetLang);
-    if (dubbedVideo && fs.existsSync(dubbedVideo)) {
-      return fs.readFileSync(dubbedVideo);
-    }
-    return null;
-  } catch (err) {
-    console.log('Multi-speaker dubbing failed:', err.message);
-    return null;
-  }
-}
-
-async function dubWithMultiSpeaker(videoPath, targetLang) {
-  console.log("\n🎯 USING MULTI-SPEAKER DUBBING");
-🎯 USING MULTI-SPEAKER DUBBING");
-  const dubber = new MultiSpeakerDubber(
-    process.env.ASSEMBLYAI_API_KEY,
-    process.env.MODELSLAB_API_KEY
-  );
-  try {
-    const dubbedVideo = await dubber.process(videoPath, targetLang);
-    if (dubbedVideo && fs.existsSync(dubbedVideo)) {
-      return fs.readFileSync(dubbedVideo);
-    }
-    return null;
-  } catch (err) {
-    console.log("Multi-speaker failed:", err.message);
-    return null;
-  }
-}
-

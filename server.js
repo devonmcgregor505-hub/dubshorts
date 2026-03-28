@@ -10,13 +10,6 @@ const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 
 const ffmpegStatic = require('ffmpeg-static');
-const { registerFont } = require('canvas');
-
-const fontPath = path.join(__dirname, 'DejaVuSans-Bold.ttf');
-if (fs.existsSync(fontPath)) {
-  registerFont(fontPath, { family: 'CaptionFont', weight: 'bold' });
-  console.log('Font registered:', fontPath);
-}
 
 let FFMPEG_PATH = ffmpegStatic;
 try {
@@ -148,7 +141,6 @@ app.post('/dub-speakers', upload.single('video'), async (req, res) => {
 
   try {
     const result = await enqueue(async () => {
-      // Step 0: Remove captions via LaMa inpainting if requested
       let activeVideoPath = videoPath;
       if (removeCaption && captionBox) {
         console.log('Step 0: Removing captions via LaMa...');
@@ -173,24 +165,68 @@ app.post('/dub-speakers', upload.single('video'), async (req, res) => {
         const { data: videoData } = await dubWithElevenLabs(activeVideoPath, targetLang);
         const rawDubPath = path.resolve('uploads/raw_dub_' + timestamp + '.bin');
         fs.writeFileSync(rawDubPath, videoData);
-
-        const probe = spawnSync(FFMPEG_PATH, ['-i', rawDubPath], { encoding: 'utf8' });
-        const hasVideo = (probe.stderr || '').includes('Video:');
-
-        // always use original video to avoid 11labs watermark
-        if (false) {
-          runFFmpeg(['-y', '-i', rawDubPath, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-c:a', 'aac', outputPath], 180000);
-        } else {
-          // Audio only — overlay on original video (also removes any watermark)
-          runFFmpeg([
-            '-y', '-i', videoPath, '-i', rawDubPath,
-            '-map', '0:v:0', '-map', '1:a:0',
-            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-            '-c:a', 'aac', '-ac', '2', '-shortest',
-            outputPath,
-          ], 180000);
-        }
+        console.log('Raw dub size:', fs.statSync(rawDubPath).size, 'bytes');
+        runFFmpeg([
+          '-y', '-i', activeVideoPath, '-i', rawDubPath,
+          '-map', '0:v:0', '-map', '1:a:0',
+          '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+          '-c:a', 'aac', '-ac', '2', '-shortest',
+          outputPath,
+        ], 180000);
         try { fs.unlinkSync(rawDubPath); } catch(e) {}
+      }
+
+      const addCaption = req.body.addCaption === 'true';
+      const captionStyle = req.body.captionStyle ? JSON.parse(req.body.captionStyle) : {};
+      if (addCaption && process.env.ASSEMBLYAI_API_KEY) {
+        console.log('Step: Transcribing dubbed audio with AssemblyAI...');
+        const audioPath = path.resolve('uploads/dub_audio_' + timestamp + '.mp3');
+        runFFmpeg(['-y', '-i', outputPath, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'mp3', audioPath], 60000);
+        const audioBuffer = fs.readFileSync(audioPath);
+        const uploadRes = await axios.post('https://api.assemblyai.com/v2/upload', audioBuffer, {
+          headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY, 'content-type': 'application/octet-stream' }, timeout: 60000
+        });
+        const jobRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
+          audio_url: uploadRes.data.upload_url, punctuate: true, speech_models: ['universal-2']
+        }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
+        let words = [];
+        for (let i = 0; i < 60; i++) {
+          await new Promise(r => setTimeout(r, 3000));
+          const poll = await axios.get('https://api.assemblyai.com/v2/transcript/' + jobRes.data.id, {
+            headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 15000
+          });
+          if (poll.data.status === 'completed') { words = poll.data.words || []; break; }
+          if (poll.data.status === 'error') throw new Error('AssemblyAI: ' + poll.data.error);
+        }
+        try { fs.unlinkSync(audioPath); } catch(e) {}
+        if (words.length > 0) {
+          console.log('Step: Burning ' + words.length + ' words onto video...');
+          const wordsForPy = words.map(w => ({ text: w.text, start: w.start / 1000, end: w.end / 1000 }));
+          const captionOutput = path.resolve('outputs/captioned_' + timestamp + '.mp4');
+          const python = path.join(__dirname, 'venv/bin/python');
+          const script = path.join(__dirname, 'burn_captions.py');
+          const burnResult = spawnSync(python, [script, outputPath, captionOutput, JSON.stringify(wordsForPy), JSON.stringify(captionStyle)], {
+            timeout: 900000, maxBuffer: 100 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe']
+          });
+          const burnOut = (burnResult.stdout || '').toString();
+          const burnErr = (burnResult.stderr || '').toString();
+          if (burnOut) console.log('[captions]', burnOut.trim());
+          if (burnResult.status === 0 && fs.existsSync(captionOutput) && fs.statSync(captionOutput).size > 10000) {
+            const captionWithAudio = path.resolve('outputs/captioned_audio_' + timestamp + '.mp4');
+            runFFmpeg([
+              '-y', '-i', captionOutput, '-i', outputPath,
+              '-map', '0:v:0', '-map', '1:a:0',
+              '-c:v', 'copy', '-c:a', 'aac', '-shortest',
+              captionWithAudio
+            ], 120000);
+            fs.copyFileSync(captionWithAudio, outputPath);
+            try { fs.unlinkSync(captionOutput); } catch(e) {}
+            try { fs.unlinkSync(captionWithAudio); } catch(e) {}
+            console.log('Captions burned successfully');
+          } else {
+            console.error('Caption burn failed:', burnErr.slice(-300));
+          }
+        }
       }
 
       console.log('Done! Output:', fs.statSync(outputPath).size, 'bytes');
@@ -209,89 +245,25 @@ app.post('/dub-speakers', upload.single('video'), async (req, res) => {
   }
 });
 
-app.post('/translate', upload.single('video'), async (req, res) => {
-  req.url = '/dub-speakers';
-  app._router.handle(req, res, () => {});
-});
-
-app.post('/split-speakers', upload.single('video'), async (req, res) => {
-  const videoPath = path.resolve(req.file.path);
-  const timestamp = Date.now();
-  const workDir = path.resolve('outputs/split_' + timestamp);
-  fs.mkdirSync(workDir, { recursive: true });
-  try {
-    if (!process.env.ASSEMBLYAI_API_KEY) throw new Error('ASSEMBLYAI_API_KEY not set');
-    const audioPath = path.resolve(workDir, 'full_audio.mp3');
-    runFFmpeg(['-y', '-i', videoPath, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'mp3', audioPath], 60000);
-    const audioBuffer = fs.readFileSync(audioPath);
-    const uploadRes = await axios.post('https://api.assemblyai.com/v2/upload', audioBuffer, {
-      headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY, 'content-type': 'application/octet-stream' }, timeout: 60000
-    });
-    const jobRes = await axios.post('https://api.assemblyai.com/v2/transcript', {
-      audio_url: uploadRes.data.upload_url, speaker_labels: true
-    }, { headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 30000 });
-    let utterances = [];
-    for (let i = 0; i < 60; i++) {
-      await new Promise(r => setTimeout(r, 3000));
-      const poll = await axios.get('https://api.assemblyai.com/v2/transcript/' + jobRes.data.id, {
-        headers: { 'authorization': process.env.ASSEMBLYAI_API_KEY }, timeout: 15000
-      });
-      if (poll.data.status === 'completed') { utterances = poll.data.utterances || []; break; }
-      if (poll.data.status === 'error') throw new Error('AssemblyAI: ' + poll.data.error);
-    }
-    if (utterances.length === 0) throw new Error('No utterances detected');
-    const speakers = [...new Set(utterances.map(u => u.speaker))];
-    const clips = [];
-    for (let i = 0; i < utterances.length; i++) {
-      const u = utterances[i];
-      const start = u.start / 1000;
-      const dur = (u.end - u.start) / 1000;
-      if (dur < 0.3) continue;
-      const clipName = 'speaker_' + u.speaker + '_seg' + String(i).padStart(3,'0') + '_' + start.toFixed(1) + 's.mp3';
-      const clipPath = path.resolve(workDir, clipName);
-      try {
-        runFFmpeg(['-y', '-ss', String(start), '-i', audioPath, '-t', String(dur), '-c:a', 'mp3', clipPath], 30000);
-        if (fs.existsSync(clipPath) && fs.statSync(clipPath).size > 500) {
-          clips.push({ name: clipName, speaker: u.speaker, start: start.toFixed(2), dur: dur.toFixed(2), text: u.text, url: '/outputs/split_' + timestamp + '/' + clipName });
-        }
-      } catch(e) { console.log('Seg', i, 'failed:', e.message); }
-    }
-    try { fs.unlinkSync(videoPath); } catch(e) {}
-    setTimeout(() => { try { fs.rmSync(workDir, { recursive: true, force: true }); } catch(e) {} }, 600000);
-    res.json({ success: true, speakers, segments: clips });
-  } catch(err) {
-    console.error('split-speakers error:', err.message);
-    try { fs.unlinkSync(videoPath); } catch(e) {}
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 app.get('/queue', (req, res) => {
   res.json({ active: activeJobs, waiting: queue.length, max: MAX_CONCURRENT });
 });
 
-app.listen(PORT, () => { console.log('DubShorts running at http://localhost:' + PORT);
+app.post('/auto-detect-box', upload.single('video'), async (req, res) => {
+  const videoPath = path.resolve(req.file.path);
+  try {
+    const python = path.resolve(__dirname, 'venv/bin/python');
+    const script = path.resolve(__dirname, 'auto_detect_box.py');
+    const result = spawnSync(python, [script, videoPath], { encoding: 'utf8', timeout: 60000 });
+    if (result.status !== 0) throw new Error(result.stderr?.slice(-300) || 'Detection failed');
+    const box = JSON.parse(result.stdout.trim().split('\n').pop());
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+    res.json({ success: true, box });
+  } catch(err) {
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
-
-process.on('uncaughtException', (err) => {
-  if (err.code === 'EPIPE') return;
-  console.error('Uncaught exception:', err.message);
-});
-
-// ── Caption removal via LaMa ──────────────────────────────────────────────────
-function runInpaint(videoIn, videoOut, box) {
-  const python = path.join(__dirname, 'venv/bin/python');
-  const script = path.join(__dirname, 'inpaint_captions.py');
-  const result = spawnSync(python, [script, videoIn, videoOut, JSON.stringify(box)], {
-    timeout: 600000,
-    maxBuffer: 100 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const out = (result.stdout || '').toString();
-  const err = (result.stderr || '').toString();
-  if (out) console.log('[inpaint]', out.trim());
-  if (result.status !== 0) throw new Error('Inpaint failed: ' + err.slice(-400));
-}
 
 app.post('/remove-captions', upload.single('video'), async (req, res) => {
   const videoPath = path.resolve(req.file.path);
@@ -307,14 +279,14 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
 
   try {
     await enqueue(async () => {
-      console.log('Step 1: Inpainting captions at 540p...');
+      console.log('Step 1: Inpainting captions...');
       runInpaint(videoPath, inpainted540, box);
 
       console.log('Step 2: Upscaling to 1080p + merging original audio...');
       runFFmpeg([
         '-y',
-        '-i', inpainted540,   // inpainted video (no audio)
-        '-i', videoPath,       // original (for audio)
+        '-i', inpainted540,
+        '-i', videoPath,
         '-map', '0:v:0',
         '-map', '1:a:0',
         '-vf', 'scale=1080:-2',
@@ -336,4 +308,117 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
     try { fs.rmSync(workDir, { recursive: true, force: true }); } catch(e) {}
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+app.post('/remove-captions-fast', upload.single('video'), async (req, res) => {
+  const videoPath = path.resolve(req.file.path);
+  const timestamp = Date.now();
+  const box = JSON.parse(req.body.captionBox || '{}');
+  if (box.x === undefined) return res.status(400).json({ success: false, error: 'No captionBox' });
+
+  const outputPath = path.resolve('outputs/clean_fast_' + timestamp + '.mp4');
+
+  try {
+    await enqueue(async () => {
+      const probe = spawnSync(FFMPEG_PATH, ['-i', videoPath], { encoding: 'utf8' });
+      const dimMatch = (probe.stderr || '').match(/(\d{3,5})x(\d{3,5})/);
+      const W = dimMatch ? parseInt(dimMatch[1]) : 1080;
+      const H = dimMatch ? parseInt(dimMatch[2]) : 1920;
+
+      const bx = Math.round(box.x * W);
+      const by = Math.round(box.y * H);
+      const bw = Math.round(box.w * W);
+      const bh = Math.round(box.h * H);
+
+      runFFmpeg([
+        '-y', '-i', videoPath,
+        '-vf', `delogo=x=${bx}:y=${by}:w=${bw}:h=${bh}:show=0`,
+        '-c:v', 'libx264', '-preset', 'fast', '-crf', '22',
+        '-c:a', 'aac',
+        outputPath,
+      ], 180000);
+
+      try { fs.unlinkSync(videoPath); } catch(e) {}
+      setTimeout(() => { try { fs.unlinkSync(outputPath); } catch(e) {} }, 600000);
+    });
+
+    res.json({ success: true, videoUrl: '/outputs/clean_fast_' + timestamp + '.mp4' });
+  } catch(err) {
+    console.error('remove-captions-fast error:', err.message);
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── LaMa inpaint with smart text masking ─────────────────────────────────────
+function runInpaint(videoIn, videoOut, box) {
+  const python = path.join(__dirname, 'venv/bin/python');
+  const script = path.join(__dirname, 'inpaint_propainter.py');
+  console.log('Running ProPainter inpaint...');
+  const result = spawnSync(python, [script, videoIn, videoOut, JSON.stringify(box)], {
+    timeout: 600000,
+    maxBuffer: 100 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const out = (result.stdout || '').toString();
+  const err = (result.stderr || '').toString();
+  if (out) console.log('[lama]', out.trim());
+  if (result.status !== 0) throw new Error('Inpaint failed: ' + err.slice(-400));
+}
+
+
+app.post('/remove-captions-auto', upload.single('video'), async (req, res) => {
+  const videoPath = path.resolve(req.file.path);
+  const timestamp = Date.now();
+  const outputPath = path.resolve('outputs/clean_auto_' + timestamp + '.mp4');
+  const workDir = path.resolve('outputs/inpaint_auto_' + timestamp);
+  fs.mkdirSync(workDir, { recursive: true });
+  try {
+    await enqueue(async () => {
+      console.log('Step 1: Auto-detecting text in video...');
+      const python = path.join(__dirname, 'venv/bin/python');
+      const script = path.join(__dirname, 'detect_and_inpaint.py');
+      const tempOutput = path.resolve(workDir, 'inpainted_temp.mp4');
+      const result = spawnSync(python, [script, videoPath, tempOutput], {
+        timeout: 900000,
+        maxBuffer: 100 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const out = (result.stdout || '').toString();
+      const err = (result.stderr || '').toString();
+      if (out) console.log('[auto-detect]', out.trim());
+      if (result.status !== 0) throw new Error('Auto-detection failed: ' + err.slice(-400));
+      console.log('Step 2: Finalizing video...');
+      if (!fs.existsSync(tempOutput)) throw new Error('Inpainting produced no output file');
+      const probeInpainted = spawnSync(FFMPEG_PATH, ['-i', tempOutput], { encoding: 'utf8' });
+      const hasAudio = (probeInpainted.stderr || '').includes('Audio:');
+      if (!hasAudio) {
+        console.log('Inpainted video missing audio, adding original...');
+        const tempWithAudio = path.resolve(workDir, 'with_audio.mp4');
+        runFFmpeg(['-y', '-i', tempOutput, '-i', videoPath, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264', '-preset', 'fast', '-crf', '22', '-c:a', 'aac', '-ac', '2', '-shortest', tempWithAudio], 180000);
+        fs.copyFileSync(tempWithAudio, outputPath);
+        try { fs.unlinkSync(tempWithAudio); } catch(e) {}
+      } else {
+        fs.copyFileSync(tempOutput, outputPath);
+      }
+      try { fs.unlinkSync(videoPath); } catch(e) {}
+      try { fs.unlinkSync(tempOutput); } catch(e) {}
+      try { fs.rmSync(workDir, { recursive: true, force: true }); } catch(e) {}
+      setTimeout(() => { try { fs.unlinkSync(outputPath); } catch(e) {} }, 600000);
+      return { success: true, videoUrl: '/outputs/clean_auto_' + timestamp + '.mp4' };
+    });
+    res.json({ success: true, videoUrl: '/outputs/clean_auto_' + timestamp + '.mp4' });
+  } catch(err) {
+    console.error('remove-captions-auto error:', err.message);
+    try { fs.unlinkSync(videoPath); } catch(e) {}
+    try { fs.rmSync(workDir, { recursive: true, force: true }); } catch(e) {}
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.listen(PORT, () => { console.log('DubShorts running at http://localhost:' + PORT); });
+
+process.on('uncaughtException', (err) => {
+  if (err.code === 'EPIPE') return;
+  console.error('Uncaught exception:', err.message);
 });

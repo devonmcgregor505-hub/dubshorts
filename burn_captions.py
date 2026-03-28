@@ -1,169 +1,206 @@
 #!/usr/bin/env python3
-"""
-Burn captions that EXACTLY match the frontend preview
-Uses the same rendering logic as the canvas preview in index.html
-"""
+import sys, os, json, subprocess, shutil
 import cv2
-import json
-import sys
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
-def hex_to_bgr(hex_color):
-    """Convert hex color to BGR for OpenCV"""
-    hex_color = hex_color.lstrip('#')
-    if len(hex_color) == 6:
-        return tuple(int(hex_color[i:i+2], 16) for i in (4, 2, 0))
-    return (255, 255, 255)
+def hex_to_rgb(h):
+    h = h.lstrip('#')
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
-def draw_text_with_outline(img, text, x, y, font_scale, thickness, color, outline_color, outline_thickness, shadow_size=0):
-    """Draw text with outline - matching frontend canvas preview exactly"""
-    font = cv2.FONT_HERSHEY_DUPLEX
-    
-    # Draw shadow if enabled (like frontend)
-    if shadow_size > 0:
-        shadow_offset = int(shadow_size * font_scale * 0.3)
-        cv2.putText(img, text, (x + shadow_offset, y + shadow_offset), font, font_scale, 
-                   (0, 0, 0), thickness + 1, cv2.LINE_AA)
-    
-    # Draw outline
-    if outline_thickness > 0:
-        cv2.putText(img, text, (x, y), font, font_scale, outline_color, outline_thickness, cv2.LINE_AA)
-    
-    # Draw main text
-    cv2.putText(img, text, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
+def apply_case(text, case):
+    if case == 'upper': return text.upper()
+    if case == 'lower': return text.lower()
+    return text
 
-def burn_captions(input_video, output_video, cues, style):
-    """Burn captions matching frontend preview exactly"""
-    
-    cap = cv2.VideoCapture(input_video)
-    if not cap.isOpened():
-        print(f"Error: Cannot open video {input_video}")
-        return False
-    
-    # Get video properties
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+def build_lines(words, max_chars=15):
+    """Group words into lines, max_chars per line."""
+    lines = []
+    current = []
+    current_len = 0
+    for w in words:
+        txt = w['text']
+        if current and current_len + len(txt) + 1 > max_chars:
+            lines.append(current)
+            current = [w]
+            current_len = len(txt)
+        else:
+            current.append(w)
+            current_len += len(txt) + (1 if current_len > 0 else 0)
+    if current:
+        lines.append(current)
+    return lines
+
+def get_active_line(lines, t):
+    """Return the line that is currently being spoken."""
+    for line in lines:
+        start = line[0]['start']
+        end = line[-1]['end']
+        if start <= t <= end + 0.15:
+            return line
+    return None
+
+def draw_frame_caption(frame, line, t, font, fs, ww, wh,
+                        text_color, outline_color, outline_w,
+                        text_case, caption_mode, highlight_color,
+                        y_pct, shadow_size):
+    img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(img)
+    cy = int(wh * y_pct)
+
+    words_txt = [apply_case(w['text'], text_case) for w in line]
+
+    # Measure total line width
+    spaces = len(words_txt) - 1
+    word_widths = [int(font.getlength(t)) for t in words_txt]
+    space_w = int(font.getlength(' '))
+    total_w = sum(word_widths) + spaces * space_w
+
+    cx = (ww - total_w) // 2
+
+    for i, (word, txt, wlen) in enumerate(zip(line, words_txt, word_widths)):
+        is_active = (caption_mode == 'highlight' and word['start'] <= t <= word['end'] + 0.05)
+        color = highlight_color if is_active else text_color
+        wx = cx + wlen // 2
+
+        # shadow
+        if shadow_size > 0:
+            off = int(fs * shadow_size * 0.3)
+            draw.text((wx, cy + off), txt, font=font, fill=(0, 0, 0, 180), anchor='mm')
+
+        # outline
+        for dx in range(-outline_w, outline_w + 1):
+            for dy in range(-outline_w, outline_w + 1):
+                if dx*dx + dy*dy <= outline_w * outline_w:
+                    draw.text((wx + dx, cy + dy), txt, font=font, fill=outline_color, anchor='mm')
+
+        # text
+        draw.text((wx, cy), txt, font=font, fill=color, anchor='mm')
+        cx += wlen + space_w
+
+    return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+def main():
+    video_in   = sys.argv[1]
+    video_out  = sys.argv[2]
+    words_json = sys.argv[3]
+    style_json = sys.argv[4]
+
+    words = json.loads(words_json)
+    style = json.loads(style_json)
+
+    cap    = cv2.VideoCapture(video_in)
+    fps    = cap.get(cv2.CAP_PROP_FPS)
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
-    print(f"Video: {width}x{height}, {fps}fps, {total_frames} frames")
-    
-    # Parse style - MATCHING FRONTEND DEFAULTS
-    y_pct = style.get('yPct', 70) / 100
-    font_size_pct = style.get('fontSize', 4) / 100  # 4% like frontend
-    font_scale = max(0.5, (height * font_size_pct) / 30)
-    
-    text_color = hex_to_bgr(style.get('textColor', '#ffffff'))
-    outline_color = hex_to_bgr(style.get('outlineColor', '#000000'))
-    highlight_color = hex_to_bgr(style.get('highlightColor', '#f5e132'))
-    
-    outline_width_pct = style.get('outlineWidth', 15) / 100
-    outline_thickness = max(1, int(font_scale * outline_width_pct * 3))
-    text_thickness = max(1, outline_thickness - 1)
-    
-    text_style = style.get('textStyle', 'bold')
-    text_case = style.get('textCase', 'upper')
-    caption_mode = style.get('captionMode', 'single')
-    shadow_size = style.get('shadowSize', 0)  # 0-1 range
-    
-    print(f"Style: mode={caption_mode}, y={int(y_pct*100)}%, font_size={font_size_pct*100}%, shadow={shadow_size}")
-    print(f"Colors: text={style.get('textColor')}, outline={style.get('outlineColor')}, highlight={style.get('highlightColor')}")
-    
-    # Calculate Y position
-    y_pos = int(height * y_pct)
-    
-    # Setup video writer
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
-    
-    frame_count = 0
-    print(f"Processing frames...")
-    
+    total  = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration = total / fps if fps > 0 else 0
+
+    # Dynamic work resolution
+    if duration <= 10:
+        WORK_H = 720
+    elif duration <= 30:
+        WORK_H = 560
+    else:
+        WORK_H = 480
+
+    scale = WORK_H / height if height > WORK_H else 1.0
+    ww = int(width * scale)
+    wh = int(height * scale)
+
+    # Style
+    fs           = max(10, int(wh * float(style.get('fontSize', 4)) / 100))
+    text_color   = hex_to_rgb(style.get('textColor', '#ffffff'))
+    outline_color = hex_to_rgb(style.get('outlineColor', '#000000'))
+    outline_w    = max(1, int(fs * float(style.get('outlineWidth', 15)) / 100))
+    text_case    = style.get('textCase', 'upper')
+    caption_mode = style.get('captionMode', 'highlight')
+    highlight_color = hex_to_rgb(style.get('highlightColor', '#f5e132'))
+    y_pct        = float(style.get('yPct', 70)) / 100
+    shadow_size  = float(style.get('shadowSize', 0))
+
+    font_family = style.get('fontFamily', 'CaptionFont')
+    font_map = {
+        'Impact': 'fonts/Impact.ttf',
+        'Anton': 'fonts/Anton-Regular.ttf',
+        'BebasNeue': 'fonts/BebasNeue-Regular.ttf',
+        'Oswald': 'fonts/Oswald-Bold.ttf',
+        'BarlowCondensed': 'fonts/BarlowCondensed-Bold.ttf',
+        'FjallaOne': 'fonts/FjallaOne-Regular.ttf',
+        'Roboto': 'fonts/Roboto-Bold.ttf',
+        'Poppins': 'fonts/Poppins-Bold.ttf',
+        'Lato': 'fonts/Lato-Bold.ttf',
+        'Ubuntu': 'fonts/Ubuntu-Bold.ttf',
+        'Bangers': 'fonts/Bangers-Regular.ttf',
+        'Pacifico': 'fonts/Pacifico-Regular.ttf',
+        'PermanentMarker': 'fonts/PermanentMarker-Regular.ttf',
+        'Righteous': 'fonts/Righteous-Regular.ttf',
+        'Montserrat': 'fonts/Montserrat-Bold.ttf',
+        'CaptionFont': 'DejaVuSans-Bold.ttf',
+    }
+    font_file = font_map.get(font_family, 'DejaVuSans-Bold.ttf')
+    font_path = os.path.join(os.path.dirname(__file__), font_file)
+    try:
+        font = ImageFont.truetype(font_path, fs)
+    except:
+        font = ImageFont.load_default()
+
+    lines = build_lines(words, max_chars=15)
+    print(f"Built {len(lines)} lines from {len(words)} words", flush=True)
+
+    ffmpeg = shutil.which('ffmpeg') or '/opt/homebrew/bin/ffmpeg'
+    proc = subprocess.Popen([
+        ffmpeg, '-y',
+        '-f', 'rawvideo', '-vcodec', 'rawvideo',
+        '-s', f'{width}x{height}',
+        '-pix_fmt', 'bgr24',
+        '-r', str(fps),
+        '-i', 'pipe:0',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
+        '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart',
+        video_out
+    ], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+    idx = 0
+    print(f"Burning captions: {width}x{height} @ {fps}fps work={ww}x{wh}", flush=True)
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-        
-        current_time = frame_count / fps
-        
-        # Find current cue
-        current_cue = None
-        for cue in cues:
-            if cue['start'] <= current_time < cue['end']:
-                current_cue = cue
-                break
-        
-        if current_cue:
-            text = current_cue['text']
-            
-            # Apply text case (matching frontend)
-            if text_case == 'upper':
-                text = text.upper()
-            elif text_case == 'lower':
-                text = text.lower()
-            
-            if caption_mode == 'single':
-                # SINGLE WORD MODE - exactly like frontend preview
-                # Get text size for centering
-                (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_DUPLEX, 
-                                                                      font_scale, text_thickness)
-                text_x = (width - text_width) // 2
-                text_y = y_pos
-                
-                draw_text_with_outline(frame, text, text_x, text_y, font_scale, text_thickness,
-                                      text_color, outline_color, outline_thickness, shadow_size)
-                
-            else:
-                # MULTI-WORD MODE - split into words like frontend preview
-                words = text.split()
-                if not words:
-                    continue
-                
-                # Calculate word widths
-                word_widths = []
-                for word in words:
-                    (w_w, _), _ = cv2.getTextSize(word + ' ', cv2.FONT_HERSHEY_DUPLEX, font_scale, text_thickness)
-                    word_widths.append(w_w)
-                
-                # Calculate total width to center the entire phrase
-                total_width = sum(word_widths)
-                current_x = (width - total_width) // 2
-                
-                # Determine which word to highlight (middle word, like frontend)
-                mid_index = len(words) // 2 if caption_mode == 'highlight' else -1
-                
-                for i, word in enumerate(words):
-                    # Choose color based on highlight mode
-                    if caption_mode == 'highlight' and i == mid_index:
-                        word_color = highlight_color
-                    else:
-                        word_color = text_color
-                    
-                    draw_text_with_outline(frame, word, current_x, y_pos, font_scale, text_thickness,
-                                          word_color, outline_color, outline_thickness, shadow_size)
-                    
-                    current_x += word_widths[i]
-        
-        out.write(frame)
-        frame_count += 1
-        
-        if frame_count % 50 == 0:
-            print(f"Processed {frame_count}/{total_frames} frames")
-    
-    cap.release()
-    out.release()
-    print(f"✅ Completed! Saved to {output_video}")
-    return True
 
-if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        print("Usage: python burn_captions.py <input_video> <output_video> <cues_json> <style_json>")
-        sys.exit(1)
-    
-    input_video = sys.argv[1]
-    output_video = sys.argv[2]
-    cues = json.loads(sys.argv[3])
-    style = json.loads(sys.argv[4])
-    
-    success = burn_captions(input_video, output_video, cues, style)
-    sys.exit(0 if success else 1)
+        t = idx / fps
+        small = cv2.resize(frame, (ww, wh))
+        line = get_active_line(lines, t)
+        if line:
+            small = draw_frame_caption(small, line, t, font, fs, ww, wh,
+                                        text_color, outline_color, outline_w,
+                                        text_case, caption_mode, highlight_color,
+                                        y_pct, shadow_size)
+        out_frame = cv2.resize(small, (width, height))
+
+        try:
+            proc.stdin.write(out_frame.tobytes())
+        except BrokenPipeError:
+            break
+
+        idx += 1
+        if idx % 30 == 0:
+            print(f"  {idx}/{total} frames", flush=True)
+
+    cap.release()
+    try:
+        proc.stdin.close()
+    except:
+        pass
+    proc.wait()
+
+    if os.path.exists(video_out) and os.path.getsize(video_out) > 10000:
+        print(f"Done — {idx} frames → {video_out}", flush=True)
+    else:
+        stderr = proc.stderr.read().decode(errors='replace')
+        raise RuntimeError(f'FFmpeg failed: {stderr[-400:]}')
+
+if __name__ == '__main__':
+    main()

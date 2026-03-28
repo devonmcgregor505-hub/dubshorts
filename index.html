@@ -149,6 +149,23 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 .hint-txt{font-size:10px;color:var(--tdim);flex:1;line-height:1.4;}
 .clear-btn{padding:3px 8px;border:1px solid var(--bd);background:transparent;color:var(--tdim);border-radius:5px;font-size:10px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;flex-shrink:0;display:none;}
 .clear-btn:hover{border-color:var(--y);color:var(--y);}
+
+@font-face { font-family: 'Anton'; src: url('/fonts/Anton-Regular.ttf'); }
+@font-face { font-family: 'BebasNeue'; src: url('/fonts/BebasNeue-Regular.ttf'); }
+@font-face { font-family: 'Oswald'; src: url('/fonts/Oswald-Bold.ttf'); font-weight: bold; }
+@font-face { font-family: 'BarlowCondensed'; src: url('/fonts/BarlowCondensed-Bold.ttf'); font-weight: bold; }
+@font-face { font-family: 'FjallaOne'; src: url('/fonts/FjallaOne-Regular.ttf'); }
+@font-face { font-family: 'Roboto'; src: url('/fonts/Roboto-Bold.ttf'); font-weight: bold; }
+@font-face { font-family: 'Poppins'; src: url('/fonts/Poppins-Bold.ttf'); font-weight: bold; }
+@font-face { font-family: 'Lato'; src: url('/fonts/Lato-Bold.ttf'); font-weight: bold; }
+@font-face { font-family: 'Ubuntu'; src: url('/fonts/Ubuntu-Bold.ttf'); font-weight: bold; }
+@font-face { font-family: 'Bangers'; src: url('/fonts/Bangers-Regular.ttf'); }
+@font-face { font-family: 'Pacifico'; src: url('/fonts/Pacifico-Regular.ttf'); }
+@font-face { font-family: 'PermanentMarker'; src: url('/fonts/PermanentMarker-Regular.ttf'); }
+@font-face { font-family: 'Righteous'; src: url('/fonts/Righteous-Regular.ttf'); }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/Montserrat-Bold.ttf'); font-weight: bold; }
+@font-face { font-family: 'CaptionFont'; src: url('/DejaVuSans-Bold.ttf'); font-weight: bold; }
+@font-face { font-family: 'Impact'; src: url('/fonts/Impact.ttf'); font-weight: bold; }
 </style>
 </head>
 <body>
@@ -164,7 +181,7 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
     <a class="ni" href="#" onclick="soon(event)"><span class="ic">🔍</span>Scraper<span class="badge soon">SOON</span></a>
     <a class="ni" href="#" onclick="soon(event)"><span class="ic">💧</span>Watermark Remover<span class="badge soon">SOON</span></a>
     <a class="ni" href="#" onclick="soon(event)"><span class="ic">✍️</span>Auto Captions<span class="badge soon">SOON</span></a>
-    <a class="ni" href="#" onclick="soon(event)"><span class="ic">✂️</span>Caption Remover<span class="badge soon">SOON</span></a>
+    <a class="ni" href="#" onclick="showRemover()"><span class="ic">✂️</span>Caption Remover<span class="badge live">LIVE</span></a>
   </nav>
   <div class="sf">
     <div class="cb-lbl"><span>Usage</span><b>68%</b></div>
@@ -185,8 +202,8 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
     <div class="left">
 
       <!-- Upload -->
-      <div class="upload-zone" id="uploadZone">
-        <input type="file" id="fileInput" accept="video/mp4,video/quicktime,.mp4,.mov" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10;">
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click();" style="cursor:pointer;">
+        <input type="file" id="fileInput" accept="video/mp4,video/quicktime,.mp4,.mov" style="display:none;">
         <span class="up-icon">🎬</span>
         <div class="up-title">Drop video here</div>
         <div class="up-hint">MP4 or MOV · Max 200MB</div>
@@ -265,14 +282,16 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
           </div>
 
           <div class="sg" style="margin-top:10px;">
-            <div class="sfi">
+            <div class="sfi" style="grid-column:1/-1">
               <label>Font</label>
-              <select id="fontFamily" onchange="drawOverlay();savePreset();">
-                <option value="CaptionFont">DejaVu Bold</option>
-                <option value="serif">Serif</option>
-                <option value="sans-serif" selected>Sans-serif</option>
-                <option value="monospace">Monospace</option>
-              </select>
+              <div style="position:relative">
+                <input type="text" id="fontSearch" placeholder="Search fonts..." autocomplete="off"
+                  style="width:100%;background:var(--s3);border:1px solid var(--bd);color:var(--tx);padding:5px 7px;border-radius:6px 6px 0 0;font-size:11px;font-family:'DM Sans',sans-serif;outline:none;"
+                  oninput="filterFonts(this.value)">
+                <div id="fontList" style="background:var(--s3);border:1px solid var(--bd);border-top:none;border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;display:none;position:absolute;width:100%;z-index:100;"></div>
+              </div>
+              <div id="fontSelected" style="font-size:10px;color:var(--y);margin-top:3px;font-weight:600;"></div>
+              <input type="hidden" id="fontFamily" value="Impact">
             </div>
             <div class="sfi">
               <label>Style</label>
@@ -322,11 +341,10 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
         </div>
       </div>
 
-      <!-- Save Preset -->
-      <button class="preset-btn" id="savePresetBtn" onclick="savePreset()">💾 Save Preset</button>
 
       <!-- Translate button -->
       <button class="submit" id="translateBtn" onclick="startTranslation()">→ Translate to Spanish</button>
+
 
       <!-- Queue indicator -->
       <div class="queue-bar" id="queueBar">⏳ Your job is queued — please wait...</div>
@@ -377,10 +395,6 @@ input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%
 
 <script>
 const fileInput = document.getElementById('fileInput');
-document.getElementById('uploadZone').addEventListener('click', (e) => {
-  if (e.target !== fileInput) fileInput.click();
-});
-fileInput.addEventListener('click', (e) => e.stopPropagation());
 const selCanvas = document.getElementById('selCanvas');
 const ctx = selCanvas.getContext('2d');
 const previewVideo = document.getElementById('previewVideo');
@@ -394,9 +408,11 @@ let progStartTime = null;
 
 // ── PRESET ───────────────────────────────────────────────────────────────────
 function savePreset() {
-  const preset = {
+  const p = {
     yPct: captionYPct,
     fontFamily: document.getElementById('fontFamily').value,
+    fontSearchDisplay: document.getElementById('fontSearch').value,
+    fontSelectedText: document.getElementById('fontSelected').textContent,
     fontSize: document.getElementById('fontSize').value,
     textStyle: document.getElementById('textStyle').value,
     textCase: document.getElementById('textCase').value,
@@ -406,61 +422,51 @@ function savePreset() {
     shadowSize: document.getElementById('shadowSize').value,
     captionMode: captionMode,
     highlightColor: document.getElementById('highlightColor').value,
-    provider: selectedProvider,
     language: document.getElementById('langSelect').value,
     removeCaption: document.getElementById('removeToggle').checked,
     addCaption: document.getElementById('addToggle').checked,
     captionBox: captionBox,
     stylePanelOpen: document.getElementById('styleInner') ? document.getElementById('styleInner').style.display !== 'none' : true,
   };
-  localStorage.setItem('dubshorts_preset', JSON.stringify(preset));
-  const btn = document.getElementById('savePresetBtn');
-  if (btn) { btn.textContent = '✓ Saved!'; setTimeout(() => btn.textContent = '💾 Save Preset', 2000); }
+  localStorage.setItem('dubshorts_preset', JSON.stringify(p));
 }
 
 function loadPreset() {
   try {
-    const preset = JSON.parse(localStorage.getItem('dubshorts_preset'));
-    if (!preset) return;
-    if (preset.yPct !== undefined) { captionYPct = preset.yPct; document.getElementById('yPos').value = preset.yPct; document.getElementById('yposVal').textContent = preset.yPct + '%'; }
-    if (preset.fontFamily) document.getElementById('fontFamily').value = preset.fontFamily;
-    if (preset.fontSize) { document.getElementById('fontSize').value = preset.fontSize; document.getElementById('sizeVal').textContent = preset.fontSize + '%'; }
-    if (preset.textStyle) document.getElementById('textStyle').value = preset.textStyle;
-    if (preset.textCase) document.getElementById('textCase').value = preset.textCase;
-    if (preset.textColor) document.getElementById('textColor').value = preset.textColor;
-    if (preset.outlineColor) document.getElementById('outlineColor').value = preset.outlineColor;
-    if (preset.outlineWidth) { document.getElementById('outlineWidth').value = preset.outlineWidth; document.getElementById('outlineVal').textContent = preset.outlineWidth + '%'; }
-    if (preset.shadowSize) { document.getElementById('shadowSize').value = preset.shadowSize; document.getElementById('shadowVal').textContent = preset.shadowSize + '%'; }
-    if (preset.captionMode) setMode(preset.captionMode);
-    if (preset.highlightColor) document.getElementById('highlightColor').value = preset.highlightColor;
-    if (preset.provider) setProvider(preset.provider);
-    if (preset.language) { document.getElementById('langSelect').value = preset.language; updateTranslateBtn(); }
-    if (preset.removeCaption) { document.getElementById('removeToggle').checked = true; onRemove(); }
-    if (preset.addCaption) { document.getElementById('addToggle').checked = true; onAdd(); }
-    if (preset.captionBox) {
-      captionBox = preset.captionBox;
-      document.getElementById('clearBtn').style.display = 'block';
-      drawOverlay();
+    const p = JSON.parse(localStorage.getItem('dubshorts_preset'));
+    if (!p) return;
+    if (p.yPct !== undefined) { captionYPct = p.yPct; document.getElementById('yPos').value = p.yPct; document.getElementById('yposVal').textContent = p.yPct + '%'; }
+    if (p.fontFamily) {
+      document.getElementById('fontFamily').value = p.fontFamily;
+      if (p.fontSearchDisplay) document.getElementById('fontSearch').value = p.fontSearchDisplay;
+      if (p.fontSelectedText) document.getElementById('fontSelected').textContent = p.fontSelectedText;
     }
-    if (preset.stylePanelOpen === false) {
-      document.getElementById('styleInner').style.display = 'none';
-      document.getElementById('styleArrow').textContent = '▶';
+    if (p.fontSize) { document.getElementById('fontSize').value = p.fontSize; document.getElementById('sizeVal').textContent = p.fontSize + '%'; }
+    if (p.textStyle) document.getElementById('textStyle').value = p.textStyle;
+    if (p.textCase) document.getElementById('textCase').value = p.textCase;
+    if (p.textColor) document.getElementById('textColor').value = p.textColor;
+    if (p.outlineColor) document.getElementById('outlineColor').value = p.outlineColor;
+    if (p.outlineWidth) { document.getElementById('outlineWidth').value = p.outlineWidth; document.getElementById('outlineVal').textContent = p.outlineWidth + '%'; }
+    if (p.shadowSize) { document.getElementById('shadowSize').value = p.shadowSize; document.getElementById('shadowVal').textContent = p.shadowSize + '%'; }
+    if (p.captionMode) setMode(p.captionMode);
+    if (p.highlightColor) document.getElementById('highlightColor').value = p.highlightColor;
+    if (p.language) { document.getElementById('langSelect').value = p.language; updateTranslateBtn(); }
+    if (p.removeCaption) { document.getElementById('removeToggle').checked = true; onRemove(); }
+    if (p.addCaption) { document.getElementById('addToggle').checked = true; onAdd(); }
+    if (p.captionBox) { captionBox = p.captionBox; document.getElementById('clearBtn').style.display = 'block'; drawOverlay(); }
+    if (p.stylePanelOpen === false) {
+      const inner = document.getElementById('styleInner');
+      const arrow = document.getElementById('styleArrow');
+      if (inner) inner.style.display = 'none';
+      if (arrow) arrow.textContent = '\u25B6';
     }
   } catch(e) { console.error('loadPreset error:', e); }
-}
-
-// ── PROVIDER ─────────────────────────────────────────────────────────────────
-function setProvider(p) {
-  selectedProvider = p;
-  document.querySelectorAll('.provider-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.provider === p);
-  });
 }
 
 // ── CAPTION MODE ─────────────────────────────────────────────────────────────
 function setMode(mode) {
   captionMode = mode;
-  ['single', 'multi', 'highlight'].forEach(m => {
+  ['single','multi','highlight'].forEach(function(m) {
     const el = document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1));
     if (el) el.classList.toggle('active', m === mode);
   });
@@ -475,14 +481,31 @@ function fitCanvas() {
   drawOverlay();
 }
 
-fileInput.addEventListener('change', () => {
+// ── UPLOAD ────────────────────────────────────────────────────────────────────
+const uploadZone = document.getElementById('uploadZone');
+
+uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); uploadZone.style.borderColor = 'var(--y)'; });
+uploadZone.addEventListener('dragleave', function() { uploadZone.style.borderColor = ''; });
+uploadZone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  uploadZone.style.borderColor = '';
+  const f = e.dataTransfer.files[0];
+  if (f && (f.type.startsWith('video/') || f.name.match(/\.mp4$|\.mov$/i))) {
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event('change'));
+  }
+});
+
+fileInput.addEventListener('change', function() {
   const f = fileInput.files[0]; if (!f) return;
-  document.getElementById('fileName').textContent = '📎 ' + f.name;
+  document.getElementById('fileName').textContent = '\uD83D\uDCCE ' + f.name;
   document.getElementById('uploadZone').classList.add('has-file');
   document.getElementById('emptyState').style.display = 'none';
   previewVideo.style.display = 'block';
   previewVideo.src = URL.createObjectURL(f);
-  previewVideo.addEventListener('loadedmetadata', () => {
+  previewVideo.addEventListener('loadedmetadata', function() {
     if (captionBox) { document.getElementById('clearBtn').style.display = 'block'; drawOverlay(); }
     if (document.getElementById('removeToggle').checked) { selCanvas.style.pointerEvents = 'auto'; selCanvas.style.cursor = 'crosshair'; }
   }, { once: true });
@@ -491,19 +514,13 @@ fileInput.addEventListener('change', () => {
   updateHint();
 });
 
-function onLangChange() {
-  updateTranslateBtn();
-  savePreset();
-}
+function onLangChange() { updateTranslateBtn(); savePreset(); }
 
 function updateTranslateBtn() {
   const lang = document.getElementById('langSelect').value;
-  const langNames = { none: 'Process Video', es: 'Spanish', hi: 'Hindi', pt: 'Portuguese', ja: 'Japanese', fr: 'French', pl: 'Polish', it: 'Italian', zh: 'Chinese' };
+  const langNames = { none:'Process Video', es:'Spanish', hi:'Hindi', pt:'Portuguese', ja:'Japanese', fr:'French', pl:'Polish', it:'Italian', zh:'Chinese' };
   const btn = document.getElementById('translateBtn');
-  const sub = document.getElementById('topbarSub');
-  if (btn) btn.textContent = '→ Translate to ' + (langNames[lang] || lang);
-  if (lang === 'none' && btn) btn.textContent = '→ Process Video';
-  if (sub) sub.textContent = 'Translate video to ' + (langNames[lang] || lang);
+  if (btn) btn.textContent = lang === 'none' ? '\u2192 Process Video' : '\u2192 Translate to ' + (langNames[lang] || lang);
 }
 
 window.addEventListener('resize', fitCanvas);
@@ -532,7 +549,7 @@ function updateHint() {
   const add = document.getElementById('addToggle').checked;
   const h = document.getElementById('hintTxt');
   if (!fileInput.files[0]) { h.textContent = 'Upload a video to preview'; return; }
-  if (rem && add) h.textContent = 'Draw box over captions · Preview shows translated caption position';
+  if (rem && add) h.textContent = 'Draw box over captions \u00B7 Preview shows translated caption position';
   else if (rem) h.textContent = 'Draw a box over the captions you want removed';
   else if (add) h.textContent = 'Preview shows where translated captions will appear';
   else h.textContent = 'Enable an option to get started';
@@ -546,58 +563,35 @@ function onYPos() {
 }
 
 // Canvas drawing
-selCanvas.addEventListener('mousedown', e => {
+selCanvas.addEventListener('mousedown', function(e) {
   if (!document.getElementById('removeToggle').checked) return;
   const r = selCanvas.getBoundingClientRect();
   sx = e.clientX - r.left; sy = e.clientY - r.top;
   isDrawing = true; captionBox = null;
   document.getElementById('clearBtn').style.display = 'none';
 });
-selCanvas.addEventListener('mousemove', e => {
+selCanvas.addEventListener('mousemove', function(e) {
   if (!isDrawing) return;
   const r = selCanvas.getBoundingClientRect();
   ctx.clearRect(0, 0, selCanvas.width, selCanvas.height);
   drawBox(sx, sy, e.clientX - r.left - sx, e.clientY - r.top - sy);
   if (document.getElementById('addToggle').checked) drawCaption();
 });
-selCanvas.addEventListener('mouseup', e => {
+selCanvas.addEventListener('mouseup', function(e) {
   if (!isDrawing) return; isDrawing = false;
   const r = selCanvas.getBoundingClientRect();
-  const w = e.clientX - r.left - sx, h = e.clientY - r.top - sy;
-  if (Math.abs(w) > 6 && Math.abs(h) > 6) {
-    captionBox = { x: Math.min(sx, sx + w) / selCanvas.width, y: Math.min(sy, sy + h) / selCanvas.height, w: Math.abs(w) / selCanvas.width, h: Math.abs(h) / selCanvas.height };
+  const bw = e.clientX - r.left - sx, bh = e.clientY - r.top - sy;
+  if (Math.abs(bw) > 6 && Math.abs(bh) > 6) {
+    captionBox = { x: Math.min(sx, sx+bw)/selCanvas.width, y: Math.min(sy, sy+bh)/selCanvas.height, w: Math.abs(bw)/selCanvas.width, h: Math.abs(bh)/selCanvas.height };
     document.getElementById('clearBtn').style.display = 'block';
     savePreset();
   }
   drawOverlay();
 });
-selCanvas.addEventListener('touchstart', e => {
-  if (!document.getElementById('removeToggle').checked) return;
-  e.preventDefault(); const t = e.touches[0], r = selCanvas.getBoundingClientRect();
-  sx = t.clientX - r.left; sy = t.clientY - r.top; isDrawing = true; captionBox = null;
-}, { passive: false });
-selCanvas.addEventListener('touchmove', e => {
-  if (!isDrawing) return; e.preventDefault();
-  const t = e.touches[0], r = selCanvas.getBoundingClientRect();
-  ctx.clearRect(0, 0, selCanvas.width, selCanvas.height);
-  drawBox(sx, sy, t.clientX - r.left - sx, t.clientY - r.top - sy);
-  if (document.getElementById('addToggle').checked) drawCaption();
-}, { passive: false });
-selCanvas.addEventListener('touchend', e => {
-  if (!isDrawing) return; e.preventDefault(); isDrawing = false;
-  const t = e.changedTouches[0], r = selCanvas.getBoundingClientRect();
-  const w = t.clientX - r.left - sx, h = t.clientY - r.top - sy;
-  if (Math.abs(w) > 6 && Math.abs(h) > 6) {
-    captionBox = { x: Math.min(sx, sx + w) / selCanvas.width, y: Math.min(sy, sy + h) / selCanvas.height, w: Math.abs(w) / selCanvas.width, h: Math.abs(h) / selCanvas.height };
-    document.getElementById('clearBtn').style.display = 'block';
-    savePreset();
-  }
-  drawOverlay();
-}, { passive: false });
 
 function drawBox(x, y, w, h) {
   ctx.save();
-  ctx.strokeStyle = 'rgba(245,225,50,0.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = 'rgba(245,225,50,0.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
   ctx.strokeRect(x, y, w, h);
   ctx.fillStyle = 'rgba(245,225,50,0.07)'; ctx.fillRect(x, y, w, h);
   ctx.restore();
@@ -606,33 +600,32 @@ function drawBox(x, y, w, h) {
 function drawCaption() {
   const W = selCanvas.width, H = selCanvas.height;
   if (!W || !H) return;
-  const fsp = parseFloat(document.getElementById('fontSize')?.value || 4) / 100;
+  const fsp = parseFloat(document.getElementById('fontSize').value || 4) / 100;
   const fs = Math.max(8, Math.round(H * fsp));
-  const ff = document.getElementById('fontFamily')?.value || 'sans-serif';
-  const ts = document.getElementById('textStyle')?.value || 'bold';
-  const tc = document.getElementById('textColor')?.value || '#fff';
-  const oc = document.getElementById('outlineColor')?.value || '#000';
-  const ow = parseFloat(document.getElementById('outlineWidth')?.value || 15) / 100;
-  const tcase = document.getElementById('textCase')?.value || 'upper';
-  const hc = document.getElementById('highlightColor')?.value || '#f5e132';
-  const shadow = parseFloat(document.getElementById('shadowSize')?.value || 0) / 100;
+  const ff = document.getElementById('fontFamily').value || 'sans-serif';
+  const ts = document.getElementById('textStyle').value || 'bold';
+  const tc = document.getElementById('textColor').value || '#fff';
+  const oc = document.getElementById('outlineColor').value || '#000';
+  const ow = parseFloat(document.getElementById('outlineWidth').value || 15) / 100;
+  const tcase = document.getElementById('textCase').value || 'upper';
+  const hc = document.getElementById('highlightColor').value || '#f5e132';
+  const shadow = parseFloat(document.getElementById('shadowSize').value || 0) / 100;
   const y = (captionYPct / 100) * H;
-
   ctx.save();
-  ctx.font = `${ts} ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-
+  ctx.font = ts + ' ' + fs + 'px ' + ff;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (captionMode === 'single') {
-    let txt = tcase === 'lower' ? 'hola mundo' : tcase === 'normal' ? 'Hola Mundo' : 'HOLA MUNDO';
+    const txt = tcase === 'lower' ? 'hola mundo' : tcase === 'normal' ? 'Hola Mundo' : 'HOLA MUNDO';
     if (shadow > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadow * fs; ctx.shadowOffsetY = shadow * fs * 0.3; }
-    if (ow > 0) { ctx.lineWidth = fs * ow; ctx.strokeStyle = oc; ctx.lineJoin = 'round'; ctx.strokeText(txt, W / 2, y); }
+    if (ow > 0) { ctx.lineWidth = fs * ow; ctx.strokeStyle = oc; ctx.lineJoin = 'round'; ctx.strokeText(txt, W/2, y); }
     ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-    ctx.fillStyle = tc; ctx.fillText(txt, W / 2, y);
+    ctx.fillStyle = tc; ctx.fillText(txt, W/2, y);
   } else {
-    const words = tcase === 'upper' ? ['HOLA', 'MUNDO', 'AMIGOS'] : tcase === 'lower' ? ['hola', 'mundo', 'amigos'] : ['Hola', 'Mundo', 'Amigos'];
-    let curX = W / 2 - words.reduce((a, w) => a + ctx.measureText(w + ' ').width, 0) / 2;
-    words.forEach((word, i) => {
+    const words = tcase === 'upper' ? ['HOLA','MUNDO','AMIGOS'] : tcase === 'lower' ? ['hola','mundo','amigos'] : ['Hola','Mundo','Amigos'];
+    let curX = W/2 - words.reduce(function(a, ww) { return a + ctx.measureText(ww + ' ').width; }, 0) / 2;
+    words.forEach(function(word, i) {
       const ww = ctx.measureText(word + ' ').width;
-      const cx = curX + ww / 2 - ctx.measureText(' ').width / 2;
+      const cx = curX + ww/2 - ctx.measureText(' ').width/2;
       const color = (captionMode === 'highlight' && i === 1) ? hc : tc;
       if (shadow > 0) { ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = shadow * fs; ctx.shadowOffsetY = shadow * fs * 0.3; }
       if (ow > 0) { ctx.lineWidth = fs * ow; ctx.strokeStyle = oc; ctx.lineJoin = 'round'; ctx.strokeText(word, cx, y); }
@@ -647,7 +640,7 @@ function drawCaption() {
 function drawOverlay() {
   ctx.clearRect(0, 0, selCanvas.width, selCanvas.height);
   if (captionBox && document.getElementById('removeToggle').checked) {
-    drawBox(captionBox.x * selCanvas.width, captionBox.y * selCanvas.height, captionBox.w * selCanvas.width, captionBox.h * selCanvas.height);
+    drawBox(captionBox.x*selCanvas.width, captionBox.y*selCanvas.height, captionBox.w*selCanvas.width, captionBox.h*selCanvas.height);
   }
   if (document.getElementById('addToggle').checked) drawCaption();
 }
@@ -655,7 +648,7 @@ function drawOverlay() {
 function clearBox() { captionBox = null; document.getElementById('clearBtn').style.display = 'none'; drawOverlay(); savePreset(); }
 
 // ── PROGRESS ──────────────────────────────────────────────────────────────────
-const STEP_TIMES = { removal: 30, upload: 15, dubbing: 120, transcription: 20, captions: 60, merge: 10 };
+const STEP_TIMES = { removal:30, upload:15, dubbing:120, transcription:20, captions:60, merge:10 };
 
 function getEstimatedTotal(hasRemoval, hasCaptions) {
   let total = STEP_TIMES.upload + STEP_TIMES.dubbing + STEP_TIMES.merge;
@@ -673,14 +666,14 @@ function startProg() {
   document.getElementById('progWrap').style.display = 'block';
   document.getElementById('progFill').style.width = '0%';
   document.getElementById('progPct').textContent = '0%';
-  document.getElementById('progEta').textContent = `Est. ~${Math.ceil(totalSecs / 60)} min`;
-  progInterval = setInterval(() => {
+  document.getElementById('progEta').textContent = 'Est. ~' + Math.ceil(totalSecs/60) + ' min';
+  progInterval = setInterval(function() {
     const elapsed = (Date.now() - progStartTime) / 1000;
-    const pct = Math.min(91, (elapsed / totalSecs) * 100);
+    const pct = Math.min(91, (elapsed/totalSecs)*100);
     document.getElementById('progFill').style.width = pct.toFixed(1) + '%';
     document.getElementById('progPct').textContent = Math.round(pct) + '%';
     const remaining = Math.max(0, totalSecs - elapsed);
-    document.getElementById('progEta').textContent = remaining > 5 ? `~${Math.ceil(remaining)}s remaining` : 'Almost done...';
+    document.getElementById('progEta').textContent = remaining > 5 ? '~' + Math.ceil(remaining) + 's remaining' : 'Almost done...';
   }, 500);
 }
 
@@ -689,7 +682,7 @@ function finishProg() {
   document.getElementById('progFill').style.width = '100%';
   document.getElementById('progPct').textContent = '100%';
   document.getElementById('progEta').textContent = 'Complete!';
-  setTimeout(() => { document.getElementById('progWrap').style.display = 'none'; }, 1500);
+  setTimeout(function() { document.getElementById('progWrap').style.display = 'none'; }, 1500);
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -716,59 +709,152 @@ function soon(e) { e.preventDefault(); alert('Coming soon!'); }
 
 // ── TRANSLATE ─────────────────────────────────────────────────────────────────
 async function startTranslation() {
+  const btn = document.getElementById('translateBtn');
+  if (btn._mode === 'remove') {
+    const f = fileInput.files[0]; if (!f) { alert('Please select a video'); return; }
+    if (!captionBox) {
+      status('Auto-detecting caption region...');
+      const fd0 = new FormData();
+      fd0.append('video', fileInput.files[0]);
+      const r = await fetch('/auto-detect-box', { method: 'POST', body: fd0 });
+      const d = await r.json();
+      if (!d.success) { status('Auto-detect failed: ' + d.error); return; }
+      captionBox = d.box;
+      status('Caption region detected, removing...');
+    }
+    btn.disabled = true;
+    hide('doneBox'); hide('errBox');
+    startProg();
+    const fd = new FormData();
+    fd.append('video', f);
+    fd.append('captionBox', JSON.stringify(captionBox));
+    try {
+      const res = await fetch('/remove-captions-fast', { method:'POST', body:fd });
+      const data = await res.json();
+      finishProg();
+      if (data.success) {
+        show('doneBox');
+        document.getElementById('resultVideo').src = data.videoUrl;
+        document.getElementById('dlBtn').href = data.videoUrl;
+        document.querySelector('.done-title').textContent = '// DONE \u2713';
+      } else { show('errBox'); document.getElementById('errMsg').textContent = data.error; }
+    } catch(err) { finishProg(); show('errBox'); document.getElementById('errMsg').textContent = 'Could not reach the server.'; }
+    btn.disabled = false;
+    return;
+  }
   const f = fileInput.files[0]; if (!f) { alert('Please select a video'); return; }
-  document.getElementById('translateBtn').disabled = true;
+  btn.disabled = true;
   hide('doneBox'); hide('errBox');
   document.getElementById('queueBar').classList.remove('visible');
   startProg();
-
-  const fd = new FormData();
-  fd.append('video', f);
-  fd.append('provider', selectedProvider);
-  fd.append('language', document.getElementById('langSelect').value);
-  fd.append('captionStyle', JSON.stringify(getStyle()));
-  fd.append('addCaption', document.getElementById('addToggle').checked ? 'true' : 'false');
-  if (captionBox) fd.append('captionBox', JSON.stringify(captionBox));
-  if (document.getElementById('removeToggle').checked) fd.append('removeCaption', 'true');
-
+  const fd2 = new FormData();
+  fd2.append('video', f);
+  fd2.append('language', document.getElementById('langSelect').value);
+  fd2.append('captionStyle', JSON.stringify(getStyle()));
+  fd2.append('addCaption', document.getElementById('addToggle').checked ? 'true' : 'false');
+  if (captionBox) fd2.append('captionBox', JSON.stringify(captionBox));
+  if (document.getElementById('removeToggle').checked) fd2.append('removeCaption', 'true');
   try {
-    const res = await fetch("/dub-speakers", { method: "POST", body: fd });
+    const res = await fetch('/dub-speakers', { method:'POST', body:fd2 });
     const data = await res.json();
     finishProg();
     if (data.success) {
       show('doneBox');
       document.getElementById('resultVideo').src = data.videoUrl;
-      document.getElementById("dlBtn").href = data.videoUrl;
-      const clips = document.getElementById("speakerClips");
-      clips.innerHTML = "";
-      if (data.speakers) { Object.entries(data.speakers).forEach(([spk, segs]) => { clips.innerHTML += `<div style="margin-bottom:12px"><div style="font-size:11px;color:#e8ff47;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">Speaker ${spk}</div>${segs.map(s => `<div style="background:#111;border:1px solid #222;border-radius:4px;padding:10px;margin-bottom:6px"><div style="font-size:11px;color:#555;margin-bottom:4px">${s.start}s — "${s.text}"</div><audio controls src="${s.url}" style="width:100%;height:32px"></audio></div>`).join("")}</div>`; }); }
-      document.querySelector('.done-title').textContent = data.cached ? '// DONE ✓ (cached)' : '// DONE ✓';
-    } else {
-      show('errBox');
-      document.getElementById('errMsg').textContent = data.error;
-    }
-  } catch(err) {
-    finishProg();
-    show('errBox');
-    document.getElementById('errMsg').textContent = 'Could not reach the server.';
-  }
-  document.getElementById('translateBtn').disabled = false;
+      document.getElementById('dlBtn').href = data.videoUrl;
+      document.querySelector('.done-title').textContent = data.cached ? '// DONE \u2713 (cached)' : '// DONE \u2713';
+    } else { show('errBox'); document.getElementById('errMsg').textContent = data.error; }
+  } catch(err) { finishProg(); show('errBox'); document.getElementById('errMsg').textContent = 'Could not reach the server.'; }
+  btn.disabled = false;
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
+// ── FONT PICKER ───────────────────────────────────────────────────────────────
+const FONTS = [
+  {"name":"Impact","file":"Impact.ttf","family":"Impact"},
+  {"name":"Anton","file":"Anton-Regular.ttf","family":"Anton"},
+  {"name":"Bebas Neue","file":"BebasNeue-Regular.ttf","family":"BebasNeue"},
+  {"name":"Oswald Bold","file":"Oswald-Bold.ttf","family":"Oswald"},
+  {"name":"Barlow Condensed","file":"BarlowCondensed-Bold.ttf","family":"BarlowCondensed"},
+  {"name":"Fjalla One","file":"FjallaOne-Regular.ttf","family":"FjallaOne"},
+  {"name":"Roboto Bold","file":"Roboto-Bold.ttf","family":"Roboto"},
+  {"name":"Poppins Bold","file":"Poppins-Bold.ttf","family":"Poppins"},
+  {"name":"Lato Bold","file":"Lato-Bold.ttf","family":"Lato"},
+  {"name":"Ubuntu Bold","file":"Ubuntu-Bold.ttf","family":"Ubuntu"},
+  {"name":"Bangers","file":"Bangers-Regular.ttf","family":"Bangers"},
+  {"name":"Pacifico","file":"Pacifico-Regular.ttf","family":"Pacifico"},
+  {"name":"Permanent Marker","file":"PermanentMarker-Regular.ttf","family":"PermanentMarker"},
+  {"name":"Righteous","file":"Righteous-Regular.ttf","family":"Righteous"},
+  {"name":"Montserrat Bold","file":"Montserrat-Bold.ttf","family":"Montserrat"},
+  {"name":"DejaVu Bold","file":"DejaVuSans-Bold.ttf","family":"CaptionFont"}
+];
+
+function initFontPicker() {
+  renderFontList(FONTS);
+  document.getElementById('fontSearch').addEventListener('focus', function() {
+    document.getElementById('fontList').style.display = 'block';
+  });
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.sfi')) document.getElementById('fontList').style.display = 'none';
+  });
+}
+
+function renderFontList(fonts) {
+  document.getElementById('fontList').innerHTML = fonts.map(function(f) {
+    return '<div onclick="selectFont(\'' + f.family + '\',\'' + f.name + '\')" style="padding:6px 9px;font-size:11px;cursor:pointer;color:var(--tx);" onmouseover="this.style.background=\'var(--s4)\'" onmouseout="this.style.background=\'\'">' + f.name + '</div>';
+  }).join('');
+}
+
+function filterFonts(q) {
+  document.getElementById('fontList').style.display = 'block';
+  renderFontList(FONTS.filter(function(f) { return f.name.toLowerCase().includes(q.toLowerCase()); }));
+}
+
+function selectFont(family, name) {
+  document.getElementById('fontFamily').value = family;
+  document.getElementById('fontSelected').textContent = '\u2713 ' + name;
+  document.getElementById('fontSearch').value = name;
+  document.getElementById('fontList').style.display = 'none';
+  savePreset();
+  // Wait for font to load then redraw
+  document.fonts.load('bold 40px ' + family).then(function() {
+    drawOverlay();
+  }).catch(function() {
+    drawOverlay();
+  });
+}
+
+// ── STYLE PANEL ───────────────────────────────────────────────────────────────
 function toggleStylePanel() {
   const inner = document.getElementById('styleInner');
   const arrow = document.getElementById('styleArrow');
   const collapsed = inner.style.display === 'none';
   inner.style.display = collapsed ? 'block' : 'none';
-  arrow.textContent = collapsed ? '▼' : '▶';
+  arrow.textContent = collapsed ? '\u25BC' : '\u25B6';
   savePreset();
 }
 
+function showRemover() {
+  document.getElementById('removeToggle').checked = true;
+  onRemove();
+  document.getElementById('addToggle').checked = false;
+  onAdd();
+  document.getElementById('translateBtn').textContent = '\u2192 Remove Captions';
+  document.getElementById('translateBtn')._mode = 'remove';
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
 selCanvas.style.pointerEvents = 'none';
 loadPreset();
 updateHint();
 updateTranslateBtn();
+initFontPicker();
+// Only default to Impact if no preset saved
+const _savedPreset = localStorage.getItem('dubshorts_preset');
+const _savedFont = _savedPreset ? JSON.parse(_savedPreset).fontFamily : null;
+const _savedFontName = _savedPreset ? JSON.parse(_savedPreset).fontSearchDisplay : null;
+if (_savedFont && _savedFontName) {
+  selectFont(_savedFont, _savedFontName);
+} else {
+  selectFont('Impact', 'Impact');
+}
 </script>
-</body>
-</html>

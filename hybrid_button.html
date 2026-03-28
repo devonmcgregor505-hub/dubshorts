@@ -1,0 +1,59 @@
+<!-- UPDATE YOUR BUTTON TO THIS -->
+
+<button class="submit" id="autoDetectBtn" onclick="startHybridDetection()" style="background: linear-gradient(135deg, #2ecc71, #27ae60); margin-top: 8px;">
+  ✨ Smart Detect & Remove (Draw Box First!)
+</button>
+
+<!-- UPDATE THE JAVASCRIPT FUNCTION TO THIS -->
+
+<script>
+async function startHybridDetection() {
+  const f = fileInput.files[0];
+  if (!f) { 
+    alert('Please select a video first');
+    return; 
+  }
+  
+  // Check if user drew a box
+  if (!captionBox) {
+    alert('Please draw a box around the captions first!\n\n1. Toggle "Remove Captions" ON\n2. Draw a box around the captions\n3. Then click this button');
+    return;
+  }
+  
+  const btn = document.getElementById('autoDetectBtn');
+  btn.disabled = true;
+  
+  hide('doneBox');
+  hide('errBox');
+  startProg();
+
+  const fd = new FormData();
+  fd.append('video', f);
+  fd.append('captionBox', JSON.stringify(captionBox));  // Send the user's box
+
+  try {
+    console.log('Sending video with user box for hybrid detection...');
+    const res = await fetch('/remove-captions-auto', { method: 'POST', body: fd });
+    const data = await res.json();
+    
+    finishProg();
+    
+    if (data.success) {
+      show('doneBox');
+      document.getElementById('resultVideo').src = data.videoUrl;
+      document.getElementById('dlBtn').href = data.videoUrl;
+      document.querySelector('.done-title').textContent = '// SMART REMOVED ✓';
+      document.getElementById('dlBtn').textContent = '⬇ Download Clean Video';
+    } else {
+      show('errBox');
+      document.getElementById('errMsg').textContent = data.error || 'Detection failed';
+    }
+  } catch(err) {
+    finishProg();
+    show('errBox');
+    document.getElementById('errMsg').textContent = 'Server error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>

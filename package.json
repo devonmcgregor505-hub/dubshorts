@@ -7,6 +7,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1018.0",
     "@aws-sdk/s3-request-presigner": "^3.1016.0",
     "archiver": "^7.0.1",
     "assemblyai": "^4.29.0",
