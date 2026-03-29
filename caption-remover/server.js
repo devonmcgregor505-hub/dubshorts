@@ -76,7 +76,7 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
       ], { timeout: 120000, maxBuffer: 100*1024*1024 });
     }
 
-    console.log('Sending to RunPod...');
+    console.log('Sending to RunPod... box:', JSON.stringify({x:bx,y:by,w:bw,h:bh}), 'dims:', W, H);
     const videoBuffer = fs.readFileSync(videoPath);
     const videoBase64 = videoBuffer.toString('base64');
     const maskBuffer = fs.readFileSync(maskPath);
