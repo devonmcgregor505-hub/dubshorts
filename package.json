@@ -2,8 +2,13 @@
   "name": "dubshorts",
   "version": "1.0.0",
   "scripts": {
-    "start": "node caption-remover/server.js"
+    "start": "node index.js",
+    "install": "cd caption-remover && npm install"
   },
   "dependencies": {},
-  "main": "caption-remover/server.js"
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "caption-remover/"
+  ]
 }
