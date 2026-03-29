@@ -2,6 +2,8 @@ FROM node:22-slim
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY . .
-RUN cd caption-remover && npm install
+WORKDIR /app/caption-remover
+RUN npm install
+WORKDIR /app
 EXPOSE 8080
 CMD ["node", "index.js"]
