@@ -1,4 +1,4 @@
-require('dotenv').config();
+content = """require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
@@ -17,8 +17,8 @@ app.use('/outputs', express.static('outputs'));
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 500 * 1024 * 1024 } });
 ['uploads','outputs'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d); });
 
-const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY;
-const RUNPOD_ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID;
+const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || 'rpa_MUL3QM7KGKKRZJ399ZOKTI9C29N9CTQ5NC235RKR24gc31';
+const RUNPOD_ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID || 'key_scarlet_barnacle-fb';
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
@@ -123,7 +123,7 @@ app.post('/remove-captions-fast', upload.single('video'), async (req, res) => {
   if (!box) return res.status(400).json({ success: false, error: 'No box provided' });
   try {
     const probe = spawnSync(FFMPEG_PATH, ['-i', videoPath], { encoding: 'utf8' });
-    const dim = (probe.stderr || '').match(/(\d{3,5})x(\d{3,5})/);
+    const dim = (probe.stderr || '').match(/(\\d{3,5})x(\\d{3,5})/);
     const W = dim ? parseInt(dim[1]) : 1080;
     const H = dim ? parseInt(dim[2]) : 1920;
     const bx = Math.round(box.x * W);
@@ -147,3 +147,8 @@ app.post('/remove-captions-fast', upload.single('video'), async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Caption Remover running at http://localhost:${PORT}`));
+"""
+
+with open('/Users/kanemcgregor/dubshorts/caption-remover/server.js', 'w') as f:
+    f.write(content)
+print('server.js updated!')
