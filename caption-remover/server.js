@@ -42,7 +42,7 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
 
     // Submit job to RunPod
     const submitRes = await axios.post(
-      `https://api.runpod.io/v2/${RUNPOD_ENDPOINT_ID}/run`,
+      `https://api.runpod.ai/v2/${RUNPOD_ENDPOINT_ID}/run`,
       {
         input: {
           video_base64: videoBase64,
@@ -67,7 +67,7 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
       await new Promise(r => setTimeout(r, 5000));
       
       const statusRes = await axios.get(
-        `https://api.runpod.io/v2/${RUNPOD_ENDPOINT_ID}/status/${jobId}`,
+        `https://api.runpod.ai/v2/${RUNPOD_ENDPOINT_ID}/status/${jobId}`,
         {
           headers: { 'Authorization': `Bearer ${RUNPOD_API_KEY}` },
           timeout: 15000
