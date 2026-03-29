@@ -1,11 +1,8 @@
 [phases.setup]
-nixPkgs = ["nodejs_22", "ffmpeg", "dejavu_fonts", "python311"]
+nixPkgs = ["nodejs", "ffmpeg"]
 
 [phases.install]
-cmds = [
-  "npm ci",
-  "python3 -m pip install opencv-python-headless numpy Pillow --break-system-packages"
-]
+cmds = ["cd caption-remover && npm install"]
 
 [start]
-cmd = "npm start"
+cmd = "node caption-remover/server.js"
