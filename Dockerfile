@@ -4,6 +4,4 @@ WORKDIR /app
 COPY . .
 WORKDIR /app/caption-remover
 RUN npm install
-WORKDIR /app
-EXPOSE 8080
-CMD ["node", "index.js"]
+CMD ["node", "server.js"]
