@@ -53,15 +53,15 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
 
     // Generate mask video — black with white box where captions are
     const maskPath = path.resolve(`uploads/mask_${ts}.mp4`);
-    const bx = Math.round(captionBox.x * W);
-    const by = Math.round(captionBox.y * H);
-    const bw = Math.round(captionBox.w * W);
-    const bh = Math.round(captionBox.h * H);
+    const bx = Math.max(0, Math.round(captionBox.x * W));
+    const by = Math.max(0, Math.round(captionBox.y * H));
+    const bw = Math.max(1, Math.min(Math.round(captionBox.w * W), W - bx));
+    const bh = Math.max(1, Math.min(Math.round(captionBox.h * H), H - by));
 
     const maskResult = spawnSync(FFMPEG_PATH, [
       '-y', '-i', videoPath,
-      '-vf', `color=black:s=${W}x${H}[bg];[bg]drawbox=x=${bx}:y=${by}:w=${bw}:h=${bh}:color=white:t=fill[out]`,
-      '-map', '[out]',
+      '-vf', `drawbox=x=${bx}:y=${by}:w=${bw}:h=${bh}:color=white@1.0:t=fill,hue=s=0,curves=all='0/0 1/0':red='0/0 1/0':green='0/0 1/0':blue='0/0 1/0'`,
+      '-map', '0:v',
       '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
       '-an', maskPath
     ], { timeout: 120000, maxBuffer: 100*1024*1024 });
