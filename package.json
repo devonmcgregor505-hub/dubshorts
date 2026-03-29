@@ -4,5 +4,6 @@
   "scripts": {
     "start": "node caption-remover/server.js"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "main": "caption-remover/server.js"
 }
