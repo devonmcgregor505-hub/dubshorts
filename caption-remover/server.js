@@ -5,7 +5,14 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
-const FormData = require('form-data');
+const { spawnSync } = require('child_process');
+const ffmpegStatic = require('ffmpeg-static');
+
+let FFMPEG_PATH = ffmpegStatic;
+try {
+  const r = spawnSync('which', ['ffmpeg'], { encoding: 'utf8' });
+  if (r.stdout && r.stdout.trim()) FFMPEG_PATH = r.stdout.trim();
+} catch(e) {}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,19 +41,54 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
   }
 
   try {
-    console.log('Sending to RunPod...');
+    // Get video dimensions
+    const probe = spawnSync(FFMPEG_PATH, ['-i', videoPath], { encoding: 'utf8' });
+    const dimMatch = (probe.stderr || '').match(/(\d{3,5})x(\d{3,5})/);
+    const W = dimMatch ? parseInt(dimMatch[1]) : 1080;
+    const H = dimMatch ? parseInt(dimMatch[2]) : 1920;
 
-    // Convert video to base64
+    // Get video frame count and fps
+    const fpsMatch = (probe.stderr || '').match(/(\d+(?:\.\d+)?) fps/);
+    const fps = fpsMatch ? parseFloat(fpsMatch[1]) : 30;
+
+    // Generate mask video — black with white box where captions are
+    const maskPath = path.resolve(`uploads/mask_${ts}.mp4`);
+    const bx = Math.round(captionBox.x * W);
+    const by = Math.round(captionBox.y * H);
+    const bw = Math.round(captionBox.w * W);
+    const bh = Math.round(captionBox.h * H);
+
+    const maskResult = spawnSync(FFMPEG_PATH, [
+      '-y', '-i', videoPath,
+      '-vf', `color=black:s=${W}x${H}[bg];[bg]drawbox=x=${bx}:y=${by}:w=${bw}:h=${bh}:color=white:t=fill[out]`,
+      '-map', '[out]',
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+      '-an', maskPath
+    ], { timeout: 120000, maxBuffer: 100*1024*1024 });
+
+    if (maskResult.status !== 0) {
+      // fallback simpler approach
+      const maskResult2 = spawnSync(FFMPEG_PATH, [
+        '-y', '-i', videoPath,
+        '-vf', `drawbox=x=${bx}:y=${by}:w=${bw}:h=${bh}:color=white:t=fill,format=gray,negate,negate`,
+        '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+        '-an', maskPath
+      ], { timeout: 120000, maxBuffer: 100*1024*1024 });
+    }
+
+    console.log('Sending to RunPod...');
     const videoBuffer = fs.readFileSync(videoPath);
     const videoBase64 = videoBuffer.toString('base64');
+    const maskBuffer = fs.readFileSync(maskPath);
+    const maskBase64 = maskBuffer.toString('base64');
 
-    // Submit job to RunPod
     const submitRes = await axios.post(
       `https://api.runpod.ai/v2/${RUNPOD_ENDPOINT_ID}/run`,
       {
         input: {
           video_base64: videoBase64,
-          box: captionBox
+          mask_base64: maskBase64,
+          fps: fps
         }
       },
       {
@@ -54,48 +96,36 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
           'Authorization': `Bearer ${RUNPOD_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        timeout: 60000
+        timeout: 60000,
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity
       }
     );
 
     const jobId = submitRes.data.id;
     console.log('RunPod job submitted:', jobId);
+    try { fs.unlinkSync(maskPath); } catch(e) {}
 
-    // Poll for completion
     let result = null;
     for (let i = 0; i < 360; i++) {
       await new Promise(r => setTimeout(r, 5000));
-      
       const statusRes = await axios.get(
         `https://api.runpod.ai/v2/${RUNPOD_ENDPOINT_ID}/status/${jobId}`,
-        {
-          headers: { 'Authorization': `Bearer ${RUNPOD_API_KEY}` },
-          timeout: 15000
-        }
+        { headers: { 'Authorization': `Bearer ${RUNPOD_API_KEY}` }, timeout: 15000 }
       );
-
       const { status, output, error } = statusRes.data;
       console.log(`Poll ${i+1}: ${status}`);
-
-      if (status === 'COMPLETED') {
-        result = output;
-        break;
-      }
-      if (status === 'FAILED') {
-        throw new Error('RunPod job failed: ' + (error || 'unknown error'));
-      }
+      if (status === 'COMPLETED') { result = output; break; }
+      if (status === 'FAILED') throw new Error('RunPod job failed: ' + (error || 'unknown error'));
     }
 
     if (!result) throw new Error('RunPod job timed out');
     if (result.error) throw new Error('RunPod error: ' + result.error);
 
-    // Decode result video
     const resultBuffer = Buffer.from(result.video_base64, 'base64');
     fs.writeFileSync(outputPath, resultBuffer);
-
     try { fs.unlinkSync(videoPath); } catch(e) {}
     setTimeout(() => { try { fs.unlinkSync(outputPath); } catch(e) {} }, 3600000);
-
     console.log('Done! Output size:', fs.statSync(outputPath).size, 'bytes');
     res.json({ success: true, videoUrl: `/outputs/clean_${ts}.mp4` });
 
@@ -106,15 +136,7 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
   }
 });
 
-// Fast mode - still runs locally via ffmpeg delogo
-const { spawnSync } = require('child_process');
-const ffmpegStatic = require('ffmpeg-static');
-let FFMPEG_PATH = ffmpegStatic;
-try {
-  const r = spawnSync('which', ['ffmpeg'], { encoding: 'utf8' });
-  if (r.stdout && r.stdout.trim()) FFMPEG_PATH = r.stdout.trim();
-} catch(e) {}
-
+// Fast mode
 app.post('/remove-captions-fast', upload.single('video'), async (req, res) => {
   const videoPath = path.resolve(req.file.path);
   const ts = Date.now();
