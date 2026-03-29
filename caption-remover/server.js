@@ -88,7 +88,8 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
         input: {
           video_base64: videoBase64,
           mask_base64: maskBase64,
-          fps: fps
+          fps: fps,
+          box: { x: bx, y: by, w: bw, h: bh }
         }
       },
       {
