@@ -43,6 +43,7 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
       timeout: 600000,
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
+      validateStatus: () => true,
     });
 
     const result = response.data;
