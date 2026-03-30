@@ -46,6 +46,7 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
     });
 
     const result = response.data;
+    console.log('Modal response:', JSON.stringify(result).slice(0, 500));
     if (result.error) throw new Error(result.error);
     if (!result.video_base64) throw new Error('No video returned from Modal');
 
