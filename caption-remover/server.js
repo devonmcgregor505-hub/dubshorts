@@ -16,8 +16,7 @@ app.use('/outputs', express.static('outputs'));
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 500 * 1024 * 1024 } });
 ['uploads','outputs'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d); });
 
-const MODAL_TOKEN_ID = process.env.MODAL_TOKEN_ID;
-const MODAL_TOKEN_SECRET = process.env.MODAL_TOKEN_SECRET;
+const MODAL_URL = 'https://devonmcgregor505--dubshorts-caption-remover-remove-captions.modal.run';
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
@@ -37,49 +36,20 @@ app.post('/remove-captions', upload.single('video'), async (req, res) => {
     const videoBuffer = fs.readFileSync(videoPath);
     const videoBase64 = videoBuffer.toString('base64');
 
-    const response = await axios.post(
-      'https://api.modal.com/v1/functions/devonmcgregor505/dubshorts-caption-remover/remove_captions/call',
-      { args: [videoBase64, captionBox], kwargs: {} },
-      {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(MODAL_TOKEN_ID + ':' + MODAL_TOKEN_SECRET).toString('base64')}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 60000,
-        maxBodyLength: Infinity,
-        maxContentLength: Infinity,
-      }
-    );
+    const response = await axios.post(MODAL_URL, {
+      video_base64: videoBase64,
+      box: captionBox
+    }, {
+      timeout: 600000,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+    });
 
-    const callId = response.data.call_id;
-    console.log('Modal call submitted:', callId);
+    const result = response.data;
+    if (result.error) throw new Error(result.error);
+    if (!result.video_base64) throw new Error('No video returned from Modal');
 
-    // Poll for result
-    let result = null;
-    for (let i = 0; i < 120; i++) {
-      await new Promise(r => setTimeout(r, 5000));
-      const poll = await axios.get(
-        `https://api.modal.com/v1/functions/devonmcgregor505/dubshorts-caption-remover/remove_captions/result/${callId}`,
-        {
-          headers: {
-            'Authorization': `Basic ${Buffer.from(MODAL_TOKEN_ID + ':' + MODAL_TOKEN_SECRET).toString('base64')}`,
-          },
-          timeout: 15000,
-        }
-      );
-      console.log(`Poll ${i+1}: ${poll.data.status}`);
-      if (poll.data.status === 'SUCCESS') {
-        result = poll.data.result;
-        break;
-      }
-      if (poll.data.status === 'FAILURE') {
-        throw new Error('Modal job failed: ' + JSON.stringify(poll.data.error));
-      }
-    }
-
-    if (!result) throw new Error('Modal job timed out');
-
-    const resultBuffer = Buffer.from(result, 'base64');
+    const resultBuffer = Buffer.from(result.video_base64, 'base64');
     fs.writeFileSync(outputPath, resultBuffer);
     try { fs.unlinkSync(videoPath); } catch(e) {}
     setTimeout(() => { try { fs.unlinkSync(outputPath); } catch(e) {} }, 3600000);
