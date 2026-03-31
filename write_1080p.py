@@ -23,7 +23,7 @@ def get_video_info(video_path):
     for s in info['streams']:
         if s['codec_type'] == 'video':
             num, den = s.get('r_frame_rate', '30/1').split('/')
-            return float(num)/float(den), int(s['width']), int(s['height'])
+            return float(num)/float(den), int(s['width']), int(s['height'])cd /Users/kanemcgregor/dubshorts/runpod-worker && docker buildx build --platform linux/amd64 -t devon7c/propainter-worker:latest --push .
     return 30.0, 1080, 1920
 
 def main():
