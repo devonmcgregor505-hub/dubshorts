@@ -2,7 +2,7 @@
   "name": "dubshorts",
   "version": "1.0.0",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "axios": "^1.14.0",
