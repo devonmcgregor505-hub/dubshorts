@@ -10,47 +10,153 @@
   --y:#f5e132;--yd:#c8b820;--yg:rgba(245,225,50,0.08);
   --blk:#080808;--s1:#111;--s2:#161616;--s3:#1e1e1e;--s4:#252525;
   --bd:#2a2a2a;--tx:#efefef;--tdim:#888;--tmut:#444;
-  --grn:#2ecc71;--red:#ff4136;
+  --grn:#2ecc71;--red:#ff4136;--pur:#a78bfa;--purg:rgba(167,139,250,0.08);
+  /* yellow accent aliases for aivg */
+  --av:#f5e132;--avg:rgba(245,225,50,0.08);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;}
 body{font-family:'DM Sans',sans-serif;background:var(--blk);color:var(--tx);display:flex;overflow:hidden;}
 
-/* Sidebar */
+/* ── Sidebar ── */
 .sidebar{width:195px;height:100vh;background:var(--s1);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0;}
 .logo{padding:16px 15px 13px;border-bottom:1px solid var(--bd);}
 .logo-mark{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--y);}
 .logo-sub{font-size:8px;color:var(--tmut);margin-top:2px;letter-spacing:2.5px;text-transform:uppercase;}
 .nav{padding:8px 7px;flex:1;overflow-y:auto;}
 .nav-lbl{font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--tmut);padding:0 8px;margin:8px 0 3px;}
-.ni{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:12px;font-weight:500;color:var(--tdim);transition:all .15s;border:1px solid transparent;margin-bottom:1px;text-decoration:none;cursor:pointer;background:none;width:100%;text-align:left;}
+.ni{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:12px;font-weight:500;color:var(--tdim);transition:all .15s;border:1px solid transparent;margin-bottom:1px;cursor:pointer;background:none;width:100%;text-align:left;}
 .ni:hover{background:var(--s2);color:var(--tx);}
 .ni.active{background:var(--yg);border-color:rgba(245,225,50,0.18);color:var(--y);}
+.ni.active-pur{background:var(--purg);border-color:rgba(167,139,250,0.22);color:var(--pur);}
 .ni .ic{font-size:13px;width:15px;text-align:center;flex-shrink:0;}
 .badge{margin-left:auto;font-size:8px;padding:2px 4px;border-radius:3px;font-weight:700;}
 .badge.soon{background:var(--s4);color:var(--tmut);}
 .badge.live{background:rgba(46,204,113,.1);color:var(--grn);}
+.badge.new{background:rgba(245,225,50,.1);color:var(--yd);}
 .sf{padding:10px 13px;border-top:1px solid var(--bd);}
 .cb-lbl{font-size:9px;color:var(--tmut);display:flex;justify-content:space-between;margin-bottom:4px;}
 .cb-lbl b{color:var(--y);font-weight:600;}
 .cb-track{background:var(--s3);border-radius:3px;height:2px;overflow:hidden;}
 .cb-fill{height:100%;background:var(--y);width:68%;border-radius:3px;}
 
-/* Main */
+/* ── Main shell ── */
 .main{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden;}
 .topbar{padding:11px 20px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:6px;flex-shrink:0;}
 .pg-title{font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:var(--y);}
+.pg-title.pur{color:var(--pur);}
 .pg-sep,.pg-sub{font-size:12px;color:var(--tdim);}
 .pill{margin-left:auto;background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.18);color:var(--grn);font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:.8px;}
-
-/* Tab panels */
+.pill.new{background:rgba(167,139,250,.07);border-color:rgba(167,139,250,.2);color:var(--pur);}
 .tab-panel{display:none;flex:1;overflow:hidden;}
 .tab-panel.active{display:flex;}
 
+/* ════════════════════════════════
+   AI VIDEO GEN TAB
+   ════════════════════════════════ */
+.aivg-layout{flex:1;display:flex;overflow:hidden;}
+
+/* Left column */
+.aivg-left{width:370px;flex-shrink:0;border-right:1px solid var(--bd);overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:11px;}
+
+/* Image upload */
+.img-drop{border:1.5px dashed var(--bd);border-radius:11px;background:var(--s1);cursor:pointer;transition:all .2s;position:relative;overflow:hidden;
+  /* 9:16 aspect but capped */
+  aspect-ratio:9/16;max-height:260px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;}
+.img-drop:hover,.img-drop.drag{border-color:var(--y);background:rgba(245,225,50,.04);}
+.img-drop.has{border-color:rgba(245,225,50,.4);border-style:solid;}
+.img-drop .ico{font-size:22px;}
+.img-drop .ttl{font-size:13px;font-weight:600;}
+.img-drop .hnt{font-size:10px;color:var(--tmut);}
+.img-drop .fnm{font-size:10px;color:var(--y);font-weight:600;padding:0 10px;word-break:break-all;}
+.img-prev{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;border-radius:9px;}
+.img-hover-layer{position:absolute;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;border-radius:9px;font-size:11px;font-weight:600;color:#fff;}
+.img-drop:hover .img-hover-layer{display:flex;}
+
+/* Prompt */
+.prompt-wrap{background:var(--s2);border:1px solid var(--bd);border-radius:9px;overflow:hidden;transition:border-color .15s;}
+.prompt-wrap:focus-within{border-color:rgba(245,225,50,.4);}
+.prompt-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--y);padding:9px 11px 0;}
+.prompt-ta{width:100%;background:transparent;border:none;color:var(--tx);padding:5px 11px 9px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.6;}
+.prompt-ta::placeholder{color:var(--tmut);}
+
+/* Settings card */
+.settings-card{background:var(--s2);border:1px solid var(--bd);border-radius:10px;overflow:hidden;}
+.settings-hd{padding:9px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:7px;}
+.settings-hd-dot{width:5px;height:5px;border-radius:50%;background:var(--y);flex-shrink:0;}
+.settings-hd-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--y);}
+.settings-body{display:flex;flex-direction:column;}
+
+/* Individual setting rows */
+.srow{display:flex;align-items:center;padding:9px 12px;border-bottom:1px solid var(--bd);gap:8px;}
+.srow:last-child{border-bottom:none;}
+.srow-label{font-size:11px;font-weight:600;color:var(--tdim);width:72px;flex-shrink:0;}
+.srow-ctrl{flex:1;display:flex;align-items:center;justify-content:flex-end;gap:6px;}
+
+/* Chips */
+.chips{display:flex;gap:4px;}
+.chip{padding:3px 9px;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--bd);background:var(--s3);color:var(--tdim);transition:all .12s;white-space:nowrap;user-select:none;}
+.chip:hover{border-color:rgba(245,225,50,.3);color:var(--tx);}
+.chip.on{background:rgba(245,225,50,.1);border-color:rgba(245,225,50,.45);color:var(--y);}
+
+/* Model select */
+.msel{background:var(--s3);border:1px solid var(--bd);color:var(--tx);padding:4px 7px;border-radius:6px;font-size:11px;font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;max-width:190px;}
+.msel:focus{border-color:rgba(245,225,50,.4);}
+
+/* Audio toggle */
+.tog{position:relative;width:32px;height:18px;flex-shrink:0;}
+.tog input{opacity:0;width:0;height:0;}
+.tog .trk{position:absolute;inset:0;background:var(--s4);border-radius:9px;cursor:pointer;border:1px solid var(--bd);transition:.15s;}
+.tog .thb{position:absolute;height:10px;width:10px;left:3px;top:3px;background:var(--tmut);border-radius:50%;transition:.15s;pointer-events:none;}
+.tog input:checked~.trk{background:var(--y);border-color:var(--y);}
+.tog input:checked~.thb{transform:translateX(14px);background:var(--blk);}
+.tog-lbl{font-size:10px;color:var(--tdim);}
+
+/* Credits display */
+.credits-display{display:flex;align-items:center;gap:7px;justify-content:flex-end;}
+.cr-badge{background:var(--s3);border:1px solid var(--bd);border-radius:5px;padding:3px 9px;font-size:11px;font-family:'Space Mono',monospace;color:var(--y);font-weight:700;}
+.cr-usd{font-size:10px;color:var(--tdim);}
+.cr-usd b{color:var(--y);}
+
+/* Generate button */
+.gen-btn{width:100%;padding:12px;background:var(--y);color:var(--blk);border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;transition:all .2s;letter-spacing:.4px;}
+.gen-btn:hover{background:#ffe600;box-shadow:0 4px 20px rgba(245,225,50,.2);}
+.gen-btn:disabled{background:var(--s4);color:var(--tmut);cursor:not-allowed;box-shadow:none;}
+
+/* Progress */
+.gen-prog{display:none;background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:12px;flex-direction:column;gap:7px;}
+.gen-prog.vis{display:flex;}
+.gp-row{display:flex;justify-content:space-between;font-size:10px;color:var(--tdim);font-family:'Space Mono',monospace;}
+.gp-track{background:var(--s4);border-radius:3px;height:3px;overflow:hidden;}
+.gp-fill{height:100%;background:linear-gradient(90deg,var(--yd),var(--y));border-radius:3px;width:0%;transition:width .4s;}
+.gp-step{font-size:10px;color:var(--y);font-family:'Space Mono',monospace;}
+
+/* Error */
+.err-box{background:rgba(255,65,54,.04);border:1px solid rgba(255,65,54,.14);border-radius:9px;padding:11px;display:none;}
+.err-ttl{font-size:10px;font-weight:700;font-family:'Space Mono',monospace;color:var(--red);margin-bottom:4px;}
+.err-msg{color:#ff7070;font-size:11px;line-height:1.5;}
+
+/* Right preview */
+.aivg-right{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;background:var(--blk);padding:20px;gap:12px;overflow-y:auto;}
+.phone-wrap{height:calc(100vh - 44px - 80px);max-height:560px;aspect-ratio:9/16;max-width:315px;position:relative;border-radius:14px;overflow:hidden;background:#000;border:1.5px solid var(--bd);box-shadow:0 16px 48px rgba(0,0,0,.7);flex-shrink:0;}
+.ph-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--tmut);}
+.ph-empty span{font-size:28px;}
+.ph-empty p{font-size:11px;}
+.ph-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;}
+.prev-lbl{font-size:9px;color:var(--tmut);font-family:'Space Mono',monospace;letter-spacing:1px;}
+.result-btns{width:100%;max-width:315px;display:none;flex-direction:column;gap:7px;}
+.result-btns.vis{display:flex;}
+.dl-btn{display:block;width:100%;padding:9px;background:var(--grn);color:#000;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;text-align:center;text-decoration:none;transition:all .2s;}
+.dl-btn:hover{background:#27ae60;}
+.regen-btn{display:block;width:100%;padding:9px;background:transparent;color:var(--y);border:1px solid rgba(245,225,50,.35);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;text-align:center;transition:all .2s;}
+.regen-btn:hover{background:var(--yg);}
+
+/* ════════════════════════════════
+   CAPTION REMOVER TAB
+   ════════════════════════════════ */
 .workspace{flex:1;display:flex;overflow:hidden;}
 .left{width:420px;flex-shrink:0;border-right:1px solid var(--bd);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:11px;}
-
-/* Upload */
 .upload-zone{border:1.5px dashed var(--bd);border-radius:11px;padding:18px 16px;text-align:center;cursor:pointer;position:relative;transition:all .2s;background:var(--s1);}
 .upload-zone:hover{border-color:var(--yd);background:var(--s2);}
 .upload-zone.has-file{border-color:rgba(245,225,50,.35);border-style:solid;background:rgba(245,225,50,.02);}
@@ -59,116 +165,99 @@ body{font-family:'DM Sans',sans-serif;background:var(--blk);color:var(--tx);disp
 .up-title{font-size:13px;font-weight:600;margin-bottom:2px;}
 .up-hint{font-size:11px;color:var(--tmut);}
 .up-name{font-size:10px;color:var(--y);font-weight:600;margin-top:4px;word-break:break-all;line-height:1.4;}
-
-/* Lang */
-.lang-row{display:flex;flex-direction:column;gap:5px;}
-.lang-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--tdim);}
-.lang-sel{background:var(--s2);border:1px solid var(--bd);color:var(--tx);padding:9px 11px;border-radius:8px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;width:100%;}
-.lang-sel:focus{border-color:rgba(245,225,50,.4);}
-
-/* Toggles */
-.tog-row{display:flex;gap:8px;}
-.tc{flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:10px 11px;display:flex;align-items:center;gap:8px;transition:all .15s;cursor:pointer;}
-.tc.on{border-color:rgba(245,225,50,.22);background:var(--yg);}
-.tc-ic{font-size:13px;flex-shrink:0;}
-.tc-info{flex:1;min-width:0;}
-.tc-title{font-size:12px;font-weight:600;}
-.tc-desc{font-size:10px;color:var(--tmut);}
-.tog{position:relative;width:34px;height:19px;flex-shrink:0;}
-.tog input{opacity:0;width:0;height:0;}
-.tog-track{position:absolute;inset:0;background:var(--s4);border-radius:10px;cursor:pointer;border:1px solid var(--bd);transition:.18s;}
-.tog-thumb{position:absolute;height:11px;width:11px;left:3px;top:3px;background:var(--tmut);border-radius:50%;transition:.18s;pointer-events:none;}
-.tog input:checked~.tog-track{background:var(--y);border-color:var(--y);}
-.tog input:checked~.tog-thumb{transform:translateX(15px);background:var(--blk);}
-
-/* Style panel */
-.style-panel{background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:13px;}
-.sp-hd{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--tdim);margin-bottom:11px;}
-.ypos-row{margin-bottom:11px;}
-.ypos-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--tmut);display:flex;justify-content:space-between;margin-bottom:5px;}
-.ypos-lbl span:last-child{color:var(--y);font-family:'Space Mono',monospace;}
-.ypos-marks{display:flex;justify-content:space-between;font-size:9px;color:var(--tmut);margin-top:2px;}
-.sg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
-.sg2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
-.sg3{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px;}
-.sfi{display:flex;flex-direction:column;gap:4px;}
-.sfi label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--tmut);}
-.sfi select{background:var(--s3);border:1px solid var(--bd);color:var(--tx);padding:5px 7px;border-radius:6px;font-size:11px;font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;}
-.sfi select:focus{border-color:rgba(245,225,50,.4);}
-.sfi input[type=color]{width:100%;height:28px;border:1px solid var(--bd);border-radius:6px;background:var(--s3);cursor:pointer;padding:2px 3px;}
-.rr{display:flex;align-items:center;gap:5px;}
-.rr input[type=range]{flex:1;accent-color:var(--y);}
-.rv{font-size:9px;color:var(--y);font-weight:700;font-family:'Space Mono',monospace;min-width:28px;text-align:right;}
-.mode-row{display:flex;gap:6px;margin-top:8px;}
-.mode-btn{flex:1;padding:6px 4px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--bd);background:var(--s3);color:var(--tdim);transition:all .15s;text-align:center;}
-.mode-btn.active{background:var(--yg);border-color:rgba(245,225,50,.35);color:var(--y);}
-.hc-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
-.hc-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--tmut);flex:1;}
-
-/* Buttons */
 .submit{width:100%;padding:12px;background:var(--y);color:var(--blk);border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;transition:all .2s;}
 .submit:hover{background:#ffe600;box-shadow:0 4px 14px rgba(245,225,50,.14);}
 .submit:disabled{background:var(--s4);color:var(--tmut);cursor:not-allowed;box-shadow:none;}
-.submit.green{background:linear-gradient(135deg,#2ecc71,#27ae60);color:#fff;}
-.submit.green:hover{background:linear-gradient(135deg,#3de07f,#2ecc71);box-shadow:0 4px 14px rgba(46,204,113,.2);}
-
-/* Progress */
 .prog-wrap{display:none;}
 .prog-lbl{font-size:10px;color:var(--tdim);font-family:'Space Mono',monospace;margin-bottom:4px;display:flex;justify-content:space-between;}
 .prog-track{background:var(--s4);border-radius:4px;height:4px;overflow:hidden;border:1px solid var(--bd);}
 .prog-fill{height:100%;background:linear-gradient(90deg,var(--y),#ffe600);border-radius:4px;width:0%;transition:width .35s ease;}
 .prog-eta{font-size:9px;color:var(--tmut);margin-top:3px;font-family:'Space Mono',monospace;}
-
-/* Done */
 .done-box{background:rgba(46,204,113,.04);border:1px solid rgba(46,204,113,.14);border-radius:9px;padding:11px;display:none;}
 .done-title{font-size:10px;font-weight:700;font-family:'Space Mono',monospace;color:var(--grn);margin-bottom:7px;}
-.dl-btn{display:block;width:100%;padding:9px;background:var(--grn);color:#000;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;margin-top:8px;text-align:center;text-decoration:none;transition:all .2s;}
-.dl-btn:hover{background:#27ae60;}
-
-/* Error */
-.err-box{background:rgba(255,65,54,.04);border:1px solid rgba(255,65,54,.14);border-radius:9px;padding:11px;display:none;}
-.err-title{font-size:10px;font-weight:700;font-family:'Space Mono',monospace;color:var(--red);margin-bottom:4px;}
-.errmsg{color:#ff7070;font-size:11px;line-height:1.5;}
-
-/* Info box */
+.dl-btn-rem{display:block;width:100%;padding:9px;background:var(--grn);color:#000;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;margin-top:8px;text-align:center;text-decoration:none;transition:all .2s;}
+.dl-btn-rem:hover{background:#27ae60;}
 .info-box{background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px;font-size:11px;color:var(--tdim);line-height:1.8;}
 .info-box b{color:var(--tx);}
-
-/* Right preview */
 .right{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;background:var(--blk);gap:10px;padding:20px;overflow-y:auto;}
-.phone-wrap{height:calc(100vh - 44px - 40px - 40px - 20px);max-height:560px;aspect-ratio:9/16;max-width:315px;position:relative;border-radius:14px;overflow:hidden;background:#000;border:1.5px solid var(--bd);box-shadow:0 16px 48px rgba(0,0,0,.7);flex-shrink:0;}
+.phone-wrap-r{height:calc(100vh - 44px - 40px - 40px - 20px);max-height:560px;aspect-ratio:9/16;max-width:315px;position:relative;border-radius:14px;overflow:hidden;background:#000;border:1.5px solid var(--bd);box-shadow:0 16px 48px rgba(0,0,0,.7);flex-shrink:0;}
 .empty-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--tmut);}
 .empty-state span{font-size:30px;}
 .empty-state p{font-size:11px;}
 .phone-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;}
-.sel-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
-.hint-bar{width:100%;max-width:315px;background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:7px 10px;display:flex;align-items:center;gap:8px;}
-.hint-txt{font-size:10px;color:var(--tdim);flex:1;line-height:1.4;}
-.clear-btn{padding:3px 8px;border:1px solid var(--bd);background:transparent;color:var(--tdim);border-radius:5px;font-size:10px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;flex-shrink:0;display:none;}
-.clear-btn:hover{border-color:var(--y);color:var(--y);}
-.preview-lbl{font-size:9px;color:var(--tmut);font-family:'Space Mono',monospace;letter-spacing:1px;}
+.preview-lbl-r{font-size:9px;color:var(--tmut);font-family:'Space Mono',monospace;letter-spacing:1px;}
 
-@font-face{font-family:'Anton';src:url('/fonts/Anton-Regular.ttf');}
-@font-face{font-family:'BebasNeue';src:url('/fonts/BebasNeue-Regular.ttf');}
-@font-face{font-family:'Oswald';src:url('/fonts/Oswald-Bold.ttf');font-weight:bold;}
-@font-face{font-family:'BarlowCondensed';src:url('/fonts/BarlowCondensed-Bold.ttf');font-weight:bold;}
-@font-face{font-family:'FjallaOne';src:url('/fonts/FjallaOne-Regular.ttf');}
-@font-face{font-family:'Roboto';src:url('/fonts/Roboto-Bold.ttf');font-weight:bold;}
-@font-face{font-family:'Poppins';src:url('/fonts/Poppins-Bold.ttf');font-weight:bold;}
-@font-face{font-family:'Lato';src:url('/fonts/Lato-Bold.ttf');font-weight:bold;}
-@font-face{font-family:'Ubuntu';src:url('/fonts/Ubuntu-Bold.ttf');font-weight:bold;}
-@font-face{font-family:'Bangers';src:url('/fonts/Bangers-Regular.ttf');}
-@font-face{font-family:'Pacifico';src:url('/fonts/Pacifico-Regular.ttf');}
-@font-face{font-family:'PermanentMarker';src:url('/fonts/PermanentMarker-Regular.ttf');}
-@font-face{font-family:'Righteous';src:url('/fonts/Righteous-Regular.ttf');}
-@font-face{font-family:'Montserrat';src:url('/fonts/Montserrat-Bold.ttf');font-weight:bold;}
-@font-face{font-family:'CaptionFont';src:url('/DejaVuSans-Bold.ttf');font-weight:bold;}
-@font-face{font-family:'Impact';src:url('/fonts/Impact.ttf');font-weight:bold;}
+/* ════════════════════════════════
+   AI AUTOMATION TAB
+   ════════════════════════════════ */
+.auto-layout{flex:1;display:flex;overflow:hidden;}
+.auto-left{width:420px;flex-shrink:0;border-right:1px solid var(--bd);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:13px;}
+
+/* Section label */
+.auto-sec-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--tdim);margin-bottom:2px;}
+
+/* Niche selector */
+.niche-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.niche-card{background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:11px 12px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:3px;}
+.niche-card:hover{border-color:rgba(245,225,50,.3);background:var(--s3);}
+.niche-card.selected{border-color:rgba(245,225,50,.5);background:var(--yg);}
+.niche-card-icon{font-size:18px;}
+.niche-card-name{font-size:12px;font-weight:600;color:var(--tx);}
+.niche-card-desc{font-size:10px;color:var(--tmut);line-height:1.4;}
+.niche-request{background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:10px 12px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:9px;font-size:12px;color:var(--tdim);}
+.niche-request:hover{border-color:rgba(245,225,50,.25);color:var(--y);}
+.niche-request-icon{font-size:14px;}
+
+/* YT Link input */
+.yt-input-wrap{background:var(--s2);border:1px solid var(--bd);border-radius:9px;overflow:hidden;transition:border-color .15s;display:flex;align-items:center;}
+.yt-input-wrap:focus-within{border-color:rgba(245,225,50,.4);}
+.yt-prefix{padding:0 10px;font-size:11px;color:var(--tmut);font-family:'Space Mono',monospace;white-space:nowrap;border-right:1px solid var(--bd);background:var(--s3);height:100%;display:flex;align-items:center;padding:10px 10px;}
+.yt-input{flex:1;background:transparent;border:none;color:var(--tx);padding:10px 11px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;}
+.yt-input::placeholder{color:var(--tmut);}
+
+/* Script textarea */
+.script-wrap{background:var(--s2);border:1px solid var(--bd);border-radius:9px;overflow:hidden;transition:border-color .15s;}
+.script-wrap:focus-within{border-color:rgba(245,225,50,.4);}
+.script-inner-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--y);padding:9px 11px 0;}
+.script-ta{width:100%;background:transparent;border:none;color:var(--tx);padding:5px 11px 10px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.6;}
+.script-ta::placeholder{color:var(--tmut);}
+
+/* Char image upload (conditional) */
+.char-upload{border:1.5px dashed var(--bd);border-radius:9px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;background:var(--s1);display:flex;flex-direction:column;align-items:center;gap:5px;}
+.char-upload:hover{border-color:var(--y);background:var(--yg);}
+.char-upload.has-char{border-color:rgba(245,225,50,.4);border-style:solid;}
+.char-upload-icon{font-size:20px;}
+.char-upload-ttl{font-size:12px;font-weight:600;}
+.char-upload-hnt{font-size:10px;color:var(--tmut);}
+.char-upload-fnm{font-size:10px;color:var(--y);font-weight:600;word-break:break-all;}
+.char-preview-wrap{position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--bd);}
+.char-preview-img{width:100%;height:100%;object-fit:cover;display:none;}
+
+/* Submit */
+.auto-submit{width:100%;padding:12px;background:var(--y);color:var(--blk);border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Space Mono',monospace;transition:all .2s;}
+.auto-submit:hover{background:#ffe600;box-shadow:0 4px 14px rgba(245,225,50,.18);}
+.auto-submit:disabled{background:var(--s4);color:var(--tmut);cursor:not-allowed;box-shadow:none;}
+
+/* Right info panel */
+.auto-right{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;background:var(--blk);padding:24px 20px;gap:14px;overflow-y:auto;}
+.auto-info-card{width:100%;max-width:360px;background:var(--s2);border:1px solid var(--bd);border-radius:12px;overflow:hidden;}
+.auto-info-hd{padding:12px 14px;border-bottom:1px solid var(--bd);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--y);}
+.auto-info-body{padding:14px;}
+.auto-step{display:flex;gap:11px;margin-bottom:13px;}
+.auto-step:last-child{margin-bottom:0;}
+.auto-step-num{width:22px;height:22px;border-radius:50%;background:var(--yg);border:1px solid rgba(245,225,50,.25);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'Space Mono',monospace;color:var(--y);}
+.auto-step-text{font-size:11px;color:var(--tdim);line-height:1.6;padding-top:2px;}
+.auto-step-text b{color:var(--tx);}
+.auto-niche-preview{width:100%;max-width:360px;background:var(--s2);border:1px solid rgba(245,225,50,.2);border-radius:12px;padding:14px;display:none;}
+.auto-niche-preview.vis{display:block;}
+.anp-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--y);margin-bottom:9px;}
+.anp-name{font-size:16px;font-weight:700;color:var(--tx);margin-bottom:4px;}
+.anp-desc{font-size:11px;color:var(--tdim);line-height:1.6;}
 </style>
 </head>
 <body>
 
-<!-- ═══ SIDEBAR ═══ -->
+<!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-mark">DubShorts</div>
@@ -176,7 +265,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--blk);color:var(--tx);disp
   </div>
   <nav class="nav">
     <div class="nav-lbl">Tools</div>
-    <button class="ni active" id="nav-dub" onclick="switchTab('dub')"><span class="ic">🎙</span>Dubbing<span class="badge live">LIVE</span></button>
+    <button class="ni active" id="nav-aivg" onclick="switchTab('aivg')"><span class="ic">✨</span>AI Video Gen<span class="badge live">LIVE</span></button>
+    <button class="ni" id="nav-auto" onclick="switchTab('auto')"><span class="ic">⚡</span>AI Automation<span class="badge new">NEW</span></button>
     <button class="ni" id="nav-remover" onclick="switchTab('remover')"><span class="ic">✂️</span>Caption Remover<span class="badge live">LIVE</span></button>
     <button class="ni" onclick="soon()"><span class="ic">🔍</span>Scraper<span class="badge soon">SOON</span></button>
     <button class="ni" onclick="soon()"><span class="ic">💧</span>Watermark Remover<span class="badge soon">SOON</span></button>
@@ -189,220 +279,195 @@ body{font-family:'DM Sans',sans-serif;background:var(--blk);color:var(--tx);disp
   </div>
 </aside>
 
-<!-- ═══ MAIN ═══ -->
+<!-- MAIN -->
 <div class="main">
   <div class="topbar">
-    <span class="pg-title" id="topTitle">Dubbing</span>
+    <span class="pg-title" id="topTitle">AI Video Gen</span>
     <span class="pg-sep"> / </span>
-    <span class="pg-sub" id="topSub">Translate video</span>
-    <div class="pill">● Live</div>
+    <span class="pg-sub" id="topSub">Image to video · Kie.ai powered</span>
+    <div class="pill" id="topPill">● Live</div>
   </div>
 
-  <!-- ══ DUBBING TAB ══ -->
-  <div class="tab-panel active" id="tab-dub">
-    <div class="workspace">
-      <div class="left">
+  <!-- ══ AI VIDEO GEN ══ -->
+  <div class="tab-panel active" id="tab-aivg">
+    <div class="aivg-layout">
 
-        <!-- Upload -->
-        <div class="upload-zone" id="dubUploadZone">
-          <input type="file" id="dubFileInput" accept="video/mp4,video/quicktime,.mp4,.mov" style="display:none">
-          <span class="up-icon">🎬</span>
-          <div class="up-title">Drop video here</div>
-          <div class="up-hint">MP4 or MOV · Max 200MB</div>
-          <div class="up-name" id="dubFileName"></div>
+      <!-- LEFT -->
+      <div class="aivg-left">
+
+        <!-- Image upload drop zone -->
+        <div class="img-drop" id="imgDrop" onclick="document.getElementById('imgInput').click()">
+          <input type="file" id="imgInput" accept="image/*" style="display:none">
+          <img class="img-prev" id="imgPrev" alt="">
+          <div class="img-hover-layer">↑ Replace image</div>
+          <span class="ico">🖼</span>
+          <div class="ttl">Drop image here</div>
+          <div class="hnt">PNG · JPG · WEBP · Reference frame</div>
+          <div class="fnm" id="imgFnm"></div>
         </div>
 
-        <!-- Language -->
-        <div class="lang-row">
-          <div class="lang-lbl">Select Language</div>
-          <select class="lang-sel" id="langSelect" onchange="updateTranslateBtn();savePreset();">
-            <option value="none">🔇 None (No Translation)</option>
-            <option value="es">🇪🇸 Spanish</option>
-            <option value="hi">🇮🇳 Hindi</option>
-            <option value="pt">🇧🇷 Portuguese</option>
-            <option value="ja">🇯🇵 Japanese</option>
-            <option value="fr">🇫🇷 French</option>
-            <option value="pl">🇵🇱 Polish</option>
-            <option value="it">🇮🇹 Italian</option>
-            <option value="zh">🇨🇳 Chinese</option>
-          </select>
+        <!-- Prompt -->
+        <div class="prompt-wrap">
+          <div class="prompt-lbl">Prompt</div>
+          <textarea class="prompt-ta" id="aivgPrompt" rows="2" placeholder="Describe the motion… e.g. 'slow cinematic zoom, golden hour lighting'"></textarea>
         </div>
 
-        <!-- Toggles -->
-        <div class="tog-row">
-          <div class="tc" id="removeCard" onclick="document.getElementById('removeToggle').click();">
-            <div class="tc-ic">🗑</div>
-            <div class="tc-info">
-              <div class="tc-title">Remove Captions</div>
-              <div class="tc-desc">Draw box over captions</div>
-            </div>
-            <label class="tog" onclick="event.stopPropagation()">
-              <input type="checkbox" id="removeToggle" onchange="onRemove();savePreset();">
-              <div class="tog-track"></div><div class="tog-thumb"></div>
-            </label>
+        <!-- Settings card -->
+        <div class="settings-card">
+          <div class="settings-hd">
+            <div class="settings-hd-dot"></div>
+            <span class="settings-hd-lbl">Settings</span>
           </div>
-          <div class="tc" id="addCard" onclick="document.getElementById('addToggle').click();">
-            <div class="tc-ic">💬</div>
-            <div class="tc-info">
-              <div class="tc-title">Add Captions</div>
-              <div class="tc-desc">Translated subtitles</div>
-            </div>
-            <label class="tog" onclick="event.stopPropagation()">
-              <input type="checkbox" id="addToggle" onchange="onAdd();savePreset();">
-              <div class="tog-track"></div><div class="tog-thumb"></div>
-            </label>
-          </div>
-        </div>
+          <div class="settings-body">
 
-        <!-- Caption Style -->
-        <div class="style-panel" id="stylePanel" style="display:none">
-          <div class="sp-hd" onclick="toggleStylePanel()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">Caption Style <span id="styleArrow">▼</span></div>
-          <div id="styleInner">
-            <div class="ypos-row">
-              <div class="ypos-lbl"><span>Vertical Position</span><span id="yposVal">70%</span></div>
-              <input type="range" id="yPos" min="5" max="95" value="70" step="1" style="width:100%;accent-color:var(--y);" oninput="onYPos()">
-              <div class="ypos-marks"><span>Top</span><span>Center</span><span>Bottom</span></div>
-            </div>
-            <div class="sfi">
-              <label>Caption Mode</label>
-              <div class="mode-row">
-                <button class="mode-btn active" id="modeSingle" onclick="setMode('single');savePreset();">Single Word</button>
-                <button class="mode-btn" id="modeMulti" onclick="setMode('multi');savePreset();">Multi Word</button>
-                <button class="mode-btn" id="modeHighlight" onclick="setMode('highlight');savePreset();">✨ Highlight</button>
-              </div>
-            </div>
-            <div class="hc-row" id="hlColorRow" style="display:none">
-              <span class="hc-lbl">Highlight Color</span>
-              <input type="color" id="highlightColor" value="#f5e132" style="width:50px;height:26px;border:1px solid var(--bd);border-radius:5px;background:var(--s3);cursor:pointer;" oninput="drawOverlay();savePreset();">
-            </div>
-            <div class="sg" style="margin-top:10px;">
-              <div class="sfi" style="grid-column:1/-1">
-                <label>Font</label>
-                <div style="position:relative">
-                  <input type="text" id="fontSearch" placeholder="Search fonts..." autocomplete="off"
-                    style="width:100%;background:var(--s3);border:1px solid var(--bd);color:var(--tx);padding:5px 7px;border-radius:6px 6px 0 0;font-size:11px;font-family:'DM Sans',sans-serif;outline:none;"
-                    oninput="filterFonts(this.value)" onfocus="document.getElementById('fontList').style.display='block'">
-                  <div id="fontList" style="background:var(--s3);border:1px solid var(--bd);border-top:none;border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;display:none;position:absolute;width:100%;z-index:100;"></div>
+            <!-- Duration -->
+            <div class="srow">
+              <span class="srow-label">Duration</span>
+              <div class="srow-ctrl">
+                <div class="chips" id="durChips">
+                  <div class="chip on" onclick="selChip(this,'dur');calcCredits()">5s</div>
+                  <div class="chip" onclick="selChip(this,'dur');calcCredits()">8s</div>
+                  <div class="chip" onclick="selChip(this,'dur');calcCredits()">10s</div>
+                  <div class="chip" onclick="selChip(this,'dur');calcCredits()">15s</div>
                 </div>
-                <div id="fontSelected" style="font-size:10px;color:var(--y);margin-top:3px;font-weight:600;"></div>
-                <input type="hidden" id="fontFamily" value="Impact">
               </div>
-              <div class="sfi">
-                <label>Style</label>
-                <select id="textStyle" onchange="drawOverlay();savePreset();">
-                  <option value="bold">Bold</option>
-                  <option value="normal">Normal</option>
-                  <option value="italic">Italic</option>
-                  <option value="bold italic">Bold Italic</option>
+            </div>
+
+            <!-- Model -->
+            <div class="srow">
+              <span class="srow-label">Model</span>
+              <div class="srow-ctrl">
+                <select class="msel" id="modelSel" onchange="calcCredits()">
+                  <optgroup label="── Grok (xAI)">
+                    <option value="grok-6s-480p" data-cr="10">Grok Aurora · 6s 480p</option>
+                    <option value="grok-6s-720p" data-cr="20">Grok Aurora · 6s 720p</option>
+                    <option value="grok-10s-720p" data-cr="30">Grok Aurora · 10s 720p</option>
+                  </optgroup>
+                  <optgroup label="── Veo (Google)">
+                    <option value="veo3-fast" data-cr="60" selected>Veo 3.1 Fast · 8s</option>
+                    <option value="veo3-quality" data-cr="400">Veo 3.1 Quality · 8s</option>
+                  </optgroup>
+                  <optgroup label="── Kling (Kuaishou)">
+                    <option value="kling3-720p" data-cr="20">Kling 3.0 · 720p /sec</option>
+                    <option value="kling3-1080p" data-cr="27">Kling 3.0 · 1080p /sec</option>
+                    <option value="kling2.5t-5s" data-cr="42">Kling 2.5 Turbo · 5s</option>
+                    <option value="kling2.5t-10s" data-cr="84">Kling 2.5 Turbo · 10s</option>
+                  </optgroup>
+                  <optgroup label="── Sora (OpenAI)">
+                    <option value="sora2-10s" data-cr="30">Sora 2 Standard · 10s</option>
+                    <option value="sora2-15s" data-cr="35">Sora 2 Standard · 15s</option>
+                  </optgroup>
+                  <optgroup label="── Hailuo (MiniMax)">
+                    <option value="hailuo02-6s" data-cr="12">Hailuo 02 · 6s 512p</option>
+                    <option value="hailuo02-10s" data-cr="20">Hailuo 02 · 10s 512p</option>
+                    <option value="hailuo23-6s" data-cr="30">Hailuo 2.3 · 6s 768p</option>
+                  </optgroup>
+                  <optgroup label="── Wan (Alibaba)">
+                    <option value="wan26-5s-720p" data-cr="70">Wan 2.6 · 5s 720p</option>
+                    <option value="wan26-10s-720p" data-cr="140">Wan 2.6 · 10s 720p</option>
+                    <option value="wan26-5s-1080p" data-cr="105">Wan 2.6 · 5s 1080p</option>
+                  </optgroup>
                 </select>
               </div>
-              <div class="sfi">
-                <label>Case</label>
-                <select id="textCase" onchange="drawOverlay();savePreset();">
-                  <option value="upper">UPPERCASE</option>
-                  <option value="normal">Normal</option>
-                  <option value="lower">lowercase</option>
-                </select>
+            </div>
+
+            <!-- Audio -->
+            <div class="srow">
+              <span class="srow-label">Audio</span>
+              <div class="srow-ctrl">
+                <span class="tog-lbl" id="audioLbl">On</span>
+                <label class="tog">
+                  <input type="checkbox" id="audioTog" checked onchange="onAudio()">
+                  <div class="trk"></div><div class="thb"></div>
+                </label>
               </div>
             </div>
-            <div class="sg2">
-              <div class="sfi">
-                <label>Size <span class="rv" id="sizeVal">4%</span></label>
-                <div class="rr"><input type="range" id="fontSize" min="2" max="12" value="4" step=".5" oninput="document.getElementById('sizeVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
-              </div>
-              <div class="sfi">
-                <label>Outline <span class="rv" id="outlineVal">15%</span></label>
-                <div class="rr"><input type="range" id="outlineWidth" min="0" max="40" value="15" step="1" oninput="document.getElementById('outlineVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
-              </div>
-              <div class="sfi"><label>Text Color</label><input type="color" id="textColor" value="#ffffff" oninput="drawOverlay();savePreset();"></div>
-              <div class="sfi"><label>Outline Color</label><input type="color" id="outlineColor" value="#000000" oninput="drawOverlay();savePreset();"></div>
-            </div>
-            <div class="sg3">
-              <div class="sfi" style="margin-top:8px;">
-                <label>Shadow <span class="rv" id="shadowVal">0%</span></label>
-                <div class="rr"><input type="range" id="shadowSize" min="0" max="50" value="0" step="1" oninput="document.getElementById('shadowVal').textContent=this.value+'%';drawOverlay();savePreset();"></div>
+
+            <!-- Resolution -->
+            <div class="srow">
+              <span class="srow-label">Resolution</span>
+              <div class="srow-ctrl">
+                <div class="chips" id="resChips">
+                  <div class="chip on" onclick="selChip(this,'res');calcCredits()">720p</div>
+                  <div class="chip" onclick="selChip(this,'res');calcCredits()">1080p</div>
+                  <div class="chip" onclick="selChip(this,'res');calcCredits()">4K</div>
+                </div>
               </div>
             </div>
+
+            <!-- Credits -->
+            <div class="srow">
+              <span class="srow-label">Credits</span>
+              <div class="srow-ctrl">
+                <div class="credits-display">
+                  <span class="cr-usd">Cost: <b id="crUsd">$0.30</b></span>
+                  <div class="cr-badge" id="crBadge">60 cr</div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <!-- Translate button -->
-        <button class="submit" id="translateBtn" onclick="startTranslation()">→ Process Video</button>
+        <!-- Generate -->
+        <button class="gen-btn" id="genBtn" onclick="startGen()">⚡ Generate Video</button>
 
-        <!-- Queue -->
-        <div class="prog-wrap" id="dubProgWrap">
-          <div class="prog-lbl"><span id="dubProgLbl">Processing...</span><span id="dubProgPct">0%</span></div>
-          <div class="prog-track"><div class="prog-fill" id="dubProgFill"></div></div>
-          <div class="prog-eta" id="dubProgEta"></div>
-        </div>
-
-        <!-- Done -->
-        <div class="done-box" id="dubDoneBox">
-          <div class="done-title" id="dubDoneTitle">// DONE ✓</div>
-          <video id="dubResultVideo" controls playsinline style="width:100%;border-radius:7px;margin-top:5px;"></video>
-          <a class="dl-btn" id="dubDlBtn" href="#" download="dubbed_video.mp4">⬇ Download Video</a>
+        <!-- Progress -->
+        <div class="gen-prog" id="genProg">
+          <div class="gp-row"><span id="gpLbl">Initializing...</span><span id="gpPct">0%</span></div>
+          <div class="gp-track"><div class="gp-fill" id="gpFill"></div></div>
+          <div class="gp-step" id="gpStep">⬡ Queuing</div>
         </div>
 
         <!-- Error -->
-        <div class="err-box" id="dubErrBox">
-          <div class="err-title">// ERROR</div>
-          <div class="errmsg" id="dubErrMsg"></div>
+        <div class="err-box" id="aivgErr">
+          <div class="err-ttl">// ERROR</div>
+          <div class="err-msg" id="aivgErrMsg"></div>
         </div>
 
       </div>
 
-      <!-- Right preview - Dubbing -->
-      <div class="right">
-        <div class="phone-wrap" id="dubPhoneWrap">
-          <div class="empty-state" id="dubEmptyState"><span>📱</span><p>Upload a video</p></div>
-          <video class="phone-video" id="dubPreviewVideo" preload="metadata" controls></video>
-          <canvas class="sel-canvas" id="selCanvas"></canvas>
+      <!-- RIGHT: phone preview -->
+      <div class="aivg-right">
+        <div class="phone-wrap">
+          <div class="ph-empty" id="phEmpty"><span>📱</span><p>Upload an image to begin</p></div>
+          <video class="ph-video" id="phVideo" controls playsinline loop></video>
         </div>
-        <div class="hint-bar">
-          <span class="hint-txt" id="hintTxt">Upload a video to preview</span>
-          <button class="clear-btn" id="clearBtn" onclick="clearBox()">✕ Clear</button>
+        <div class="prev-lbl" id="prevLbl">PREVIEW</div>
+        <div class="result-btns" id="resultBtns">
+          <a class="dl-btn" id="dlBtn" href="#" download="ai_video.mp4">⬇ Download Video</a>
+          <button class="regen-btn" onclick="startGen()">↺ Regenerate</button>
         </div>
       </div>
+
     </div>
   </div>
 
-  <!-- ══ CAPTION REMOVER TAB ══ -->
+  <!-- ══ CAPTION REMOVER ══ -->
   <div class="tab-panel" id="tab-remover">
     <div class="workspace">
       <div class="left">
-
-        <!-- Upload -->
-        <div class="upload-zone" id="remUploadZone">
-          <input type="file" id="remFileInput" accept="video/mp4,video/quicktime,.mp4,.mov" style="display:none">
+        <div class="upload-zone" id="remZone">
+          <input type="file" id="remInput" accept="video/mp4,video/quicktime,.mp4,.mov" style="display:none">
           <span class="up-icon">✂️</span>
           <div class="up-title">Drop video here</div>
           <div class="up-hint">MP4 or MOV · Up to 500MB</div>
-          <div class="up-name" id="remFileName"></div>
+          <div class="up-name" id="remFnm"></div>
         </div>
-
-        <!-- Remove button -->
         <button class="submit" id="remBtn" onclick="startRemoval()" disabled>✂️ Remove Captions</button>
-
-        <!-- Progress -->
         <div class="prog-wrap" id="remProgWrap">
           <div class="prog-lbl"><span id="remProgLbl">Detecting captions...</span><span id="remProgPct">0%</span></div>
           <div class="prog-track"><div class="prog-fill" id="remProgFill"></div></div>
           <div class="prog-eta" id="remProgEta">This takes 2–5 min depending on video length</div>
         </div>
-
-        <!-- Done -->
-        <div class="done-box" id="remDoneBox">
+        <div class="done-box" id="remDone">
           <div class="done-title">// CAPTIONS REMOVED ✓</div>
-          <a class="dl-btn" id="remDlBtn" href="#" download="clean_video.mp4">⬇ Download Clean Video</a>
+          <a class="dl-btn-rem" id="remDlBtn" href="#" download="clean_video.mp4">⬇ Download Clean Video</a>
         </div>
-
-        <!-- Error -->
-        <div class="err-box" id="remErrBox">
-          <div class="err-title">// ERROR</div>
-          <div class="errmsg" id="remErrMsg"></div>
+        <div class="err-box" id="remErr">
+          <div class="err-ttl">// ERROR</div>
+          <div class="err-msg" id="remErrMsg"></div>
         </div>
-
-        <!-- Info -->
         <div class="info-box">
           <b>How it works</b><br>
           1. EasyOCR scans frames to locate all caption text<br>
@@ -410,489 +475,436 @@ body{font-family:'DM Sans',sans-serif;background:var(--blk);color:var(--tx);disp
           3. LaMa AI inpaints those regions with background<br>
           4. Video is reassembled with your original audio
         </div>
-
       </div>
-
-      <!-- Right preview - Remover -->
       <div class="right">
-        <div class="phone-wrap" id="remPhoneWrap">
-          <div class="empty-state" id="remEmptyState"><span>📱</span><p>Upload a video to preview</p></div>
-          <video class="phone-video" id="remPreviewVideo" preload="metadata" controls></video>
+        <div class="phone-wrap-r">
+          <div class="empty-state" id="remEmpty"><span>📱</span><p>Upload a video to preview</p></div>
+          <video class="phone-video" id="remVid" preload="metadata" controls></video>
         </div>
-        <div class="preview-lbl" id="remPreviewLbl">ORIGINAL</div>
+        <div class="preview-lbl-r" id="remPrevLbl">ORIGINAL</div>
       </div>
+    </div>
+  </div>
+
+  <!-- ══ AI AUTOMATION ══ -->
+  <div class="tab-panel" id="tab-auto">
+    <div class="auto-layout">
+
+      <!-- LEFT: form -->
+      <div class="auto-left">
+
+        <!-- Niche -->
+        <div>
+          <div class="auto-sec-lbl">Niche</div>
+          <div class="niche-grid" id="nicheGrid">
+            <div class="niche-card selected" data-niche="skeleton" onclick="selectNiche(this)">
+              <span class="niche-card-icon">💀</span>
+              <div class="niche-card-name">Skeleton</div>
+              <div class="niche-card-desc">Dark, faceless skeleton character shorts</div>
+            </div>
+            <div class="niche-card" data-niche="sora2" onclick="selectNiche(this)">
+              <span class="niche-card-icon">🤖</span>
+              <div class="niche-card-name">Sora 2</div>
+              <div class="niche-card-desc">AI-generated cinematic scenes</div>
+            </div>
+            <div class="niche-card" data-niche="story" onclick="selectNiche(this)">
+              <span class="niche-card-icon">📖</span>
+              <div class="niche-card-name">Story (History)</div>
+              <div class="niche-card-desc">Historical storytelling narration</div>
+            </div>
+            <div class="niche-card" data-niche="ronaldo" onclick="selectNiche(this)">
+              <span class="niche-card-icon">⚽</span>
+              <div class="niche-card-name">Ronaldo Adventures</div>
+              <div class="niche-card-desc">Ronaldo fictional story shorts</div>
+            </div>
+            <div class="niche-card" data-niche="anim1" onclick="selectNiche(this)">
+              <span class="niche-card-icon">🎬</span>
+              <div class="niche-card-name">Animation 1</div>
+              <div class="niche-card-desc">Animated character series style A</div>
+            </div>
+            <div class="niche-card" data-niche="anim2" onclick="selectNiche(this)">
+              <span class="niche-card-icon">🎭</span>
+              <div class="niche-card-name">Animation 2</div>
+              <div class="niche-card-desc">Animated character series style B</div>
+            </div>
+          </div>
+          <div class="niche-request" onclick="requestNiche()" style="margin-top:7px;">
+            <span class="niche-request-icon">＋</span>
+            Request a new niche automation
+          </div>
+        </div>
+
+        <!-- Reference YT link -->
+        <div>
+          <div class="auto-sec-lbl">Reference Video YT Link</div>
+          <div class="yt-input-wrap">
+            <span class="yt-prefix">YT</span>
+            <input class="yt-input" type="text" id="ytLink" placeholder="https://youtube.com/watch?v=...">
+          </div>
+        </div>
+
+        <!-- Script import -->
+        <div>
+          <div class="auto-sec-lbl">Their Script Import</div>
+          <div class="script-wrap">
+            <div class="script-inner-lbl">Script</div>
+            <textarea class="script-ta" id="autoScript" rows="4" placeholder="Paste the video script here… the automation will use this as the narration and story structure."></textarea>
+          </div>
+        </div>
+
+        <!-- Character image upload (only for Skeleton) -->
+        <div id="charUploadSection">
+          <div class="auto-sec-lbl">Reference Character Image</div>
+          <div class="char-upload" id="charDrop" onclick="document.getElementById('charInput').click()">
+            <input type="file" id="charInput" accept="image/*" style="display:none">
+            <div id="charPreviewWrap" class="char-preview-wrap" style="display:none">
+              <img class="char-preview-img" id="charPreviewImg" alt="">
+            </div>
+            <span class="char-upload-icon" id="charIco">🦴</span>
+            <div class="char-upload-ttl" id="charTtl">Upload character reference</div>
+            <div class="char-upload-hnt">PNG or JPG · Used for character consistency</div>
+            <div class="char-upload-fnm" id="charFnm"></div>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <button class="auto-submit" id="autoSubmitBtn" onclick="submitAutomation()">⚡ Submit Automation Job</button>
+
+        <!-- Error -->
+        <div class="err-box" id="autoErr">
+          <div class="err-ttl">// ERROR</div>
+          <div class="err-msg" id="autoErrMsg"></div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: info + niche preview -->
+      <div class="auto-right">
+
+        <!-- How it works -->
+        <div class="auto-info-card">
+          <div class="auto-info-hd">How It Works</div>
+          <div class="auto-info-body">
+            <div class="auto-step">
+              <div class="auto-step-num">1</div>
+              <div class="auto-step-text"><b>Choose your niche</b> — each niche has a pre-built automation pipeline tuned for that content style.</div>
+            </div>
+            <div class="auto-step">
+              <div class="auto-step-num">2</div>
+              <div class="auto-step-text"><b>Paste a reference YT link</b> — we analyse the pacing, style, and structure of high-performing videos in your niche.</div>
+            </div>
+            <div class="auto-step">
+              <div class="auto-step-num">3</div>
+              <div class="auto-step-text"><b>Import your script</b> — the automation generates matching visuals, voiceover, and captions around your script.</div>
+            </div>
+            <div class="auto-step">
+              <div class="auto-step-num">4</div>
+              <div class="auto-step-text"><b>Upload a character image</b> (Skeleton niche only) — keeps your character consistent across every clip.</div>
+            </div>
+            <div class="auto-step">
+              <div class="auto-step-num">5</div>
+              <div class="auto-step-text"><b>Submit</b> — your video is queued, generated, and delivered ready to post.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selected niche preview card -->
+        <div class="auto-niche-preview vis" id="nichePreview">
+          <div class="anp-lbl">Selected Niche</div>
+          <div class="anp-name" id="npName">💀 Skeleton</div>
+          <div class="anp-desc" id="npDesc">Dark, faceless skeleton character shorts. Best performing format for mystery and philosophy content. Character image import enabled for consistency across clips.</div>
+        </div>
+
+      </div>
+
     </div>
   </div>
 
 </div><!-- /main -->
 
 <script>
-// ══════════════════════════════════════════════
-// TAB SWITCHING
-// ══════════════════════════════════════════════
+// ══ TAB SWITCHING ══
 function switchTab(tab) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  document.getElementById('nav-' + tab).classList.add('active');
-  const titles = { dub: ['Dubbing','Translate video'], remover: ['Caption Remover','AI-powered · EasyOCR + LaMa'] };
-  document.getElementById('topTitle').textContent = titles[tab][0];
-  document.getElementById('topSub').textContent = titles[tab][1];
-}
-
-function soon() { alert('Coming soon!'); }
-
-// ══════════════════════════════════════════════
-// CAPTION REMOVER TAB
-// ══════════════════════════════════════════════
-const remFileInput = document.getElementById('remFileInput');
-const remUploadZone = document.getElementById('remUploadZone');
-const remPreviewVideo = document.getElementById('remPreviewVideo');
-
-remUploadZone.addEventListener('click', () => remFileInput.click());
-remUploadZone.addEventListener('dragover', e => { e.preventDefault(); remUploadZone.classList.add('drag'); });
-remUploadZone.addEventListener('dragleave', () => remUploadZone.classList.remove('drag'));
-remUploadZone.addEventListener('drop', e => {
-  e.preventDefault(); remUploadZone.classList.remove('drag');
-  const f = e.dataTransfer.files[0];
-  if (f) loadRemFile(f);
-});
-remFileInput.addEventListener('change', () => { if (remFileInput.files[0]) loadRemFile(remFileInput.files[0]); });
-
-function loadRemFile(f) {
-  document.getElementById('remFileName').textContent = '📎 ' + f.name;
-  remUploadZone.classList.add('has-file');
-  document.getElementById('remEmptyState').style.display = 'none';
-  remPreviewVideo.style.display = 'block';
-  remPreviewVideo.src = URL.createObjectURL(f);
-  document.getElementById('remBtn').disabled = false;
-  document.getElementById('remPreviewLbl').textContent = 'ORIGINAL';
-  hide('remDoneBox'); hide('remErrBox');
-}
-
-async function startRemoval() {
-  const f = remFileInput.files[0];
-  if (!f) { alert('Please select a video first'); return; }
-  const btn = document.getElementById('remBtn');
-  btn.disabled = true;
-  hide('remDoneBox'); hide('remErrBox');
-  startRemProg();
-
-  const fd = new FormData();
-  fd.append('video', f);
-
-  try {
-    const res = await fetch('/remove-captions', { method: 'POST', body: fd });
-    const data = await res.json();
-    finishRemProg();
-    if (data.success) {
-      show('remDoneBox');
-      document.getElementById('remDlBtn').href = data.videoUrl;
-      remPreviewVideo.src = data.videoUrl;
-      document.getElementById('remPreviewLbl').textContent = 'RESULT — CAPTIONS REMOVED ✓';
-    } else {
-      show('remErrBox');
-      document.getElementById('remErrMsg').textContent = data.error;
-    }
-  } catch(err) {
-    finishRemProg();
-    show('remErrBox');
-    document.getElementById('remErrMsg').textContent = 'Server error: ' + err.message;
-  }
-  btn.disabled = false;
-}
-
-const REM_STEPS = [
-  { label: 'Loading AI models...', duration: 15 },
-  { label: 'Extracting frames...', duration: 20 },
-  { label: 'Detecting caption regions (EasyOCR)...', duration: 35 },
-  { label: 'Inpainting with LaMa AI...', duration: 120 },
-  { label: 'Reassembling video...', duration: 20 },
-];
-let remProgInterval = null;
-
-function startRemProg() {
-  clearInterval(remProgInterval);
-  document.getElementById('remProgWrap').style.display = 'block';
-  document.getElementById('remProgFill').style.width = '0%';
-  document.getElementById('remProgPct').textContent = '0%';
-  const totalMs = REM_STEPS.reduce((a, s) => a + s.duration * 1000, 0);
-  const start = Date.now();
-  remProgInterval = setInterval(() => {
-    const elapsed = (Date.now() - start) / 1000;
-    let cum = 0, lbl = REM_STEPS[REM_STEPS.length - 1].label;
-    for (const s of REM_STEPS) { cum += s.duration; if (elapsed < cum) { lbl = s.label; break; } }
-    const pct = Math.min(93, (elapsed / (totalMs / 1000)) * 100);
-    document.getElementById('remProgFill').style.width = pct.toFixed(1) + '%';
-    document.getElementById('remProgPct').textContent = Math.round(pct) + '%';
-    document.getElementById('remProgLbl').textContent = lbl;
-    const rem = Math.max(0, totalMs / 1000 - elapsed);
-    document.getElementById('remProgEta').textContent = rem > 5 ? `~${Math.ceil(rem)}s remaining` : 'Almost done...';
-  }, 400);
-}
-
-function finishRemProg() {
-  clearInterval(remProgInterval);
-  document.getElementById('remProgFill').style.width = '100%';
-  document.getElementById('remProgPct').textContent = '100%';
-  document.getElementById('remProgLbl').textContent = 'Done!';
-  document.getElementById('remProgEta').textContent = 'Complete!';
-  setTimeout(() => { document.getElementById('remProgWrap').style.display = 'none'; }, 1500);
-}
-
-// ══════════════════════════════════════════════
-// DUBBING TAB — all original logic
-// ══════════════════════════════════════════════
-const dubFileInput = document.getElementById('dubFileInput');
-const dubUploadZone = document.getElementById('dubUploadZone');
-const dubPreviewVideo = document.getElementById('dubPreviewVideo');
-const selCanvas = document.getElementById('selCanvas');
-const ctx = selCanvas.getContext('2d');
-const dubPhoneWrap = document.getElementById('dubPhoneWrap');
-
-let captionBox = null, isDrawing = false, sx = 0, sy = 0;
-let captionYPct = 70;
-let captionMode = 'single';
-let dubProgInterval = null;
-
-dubUploadZone.addEventListener('click', () => dubFileInput.click());
-dubUploadZone.addEventListener('dragover', e => { e.preventDefault(); dubUploadZone.style.borderColor = 'var(--y)'; });
-dubUploadZone.addEventListener('dragleave', () => { dubUploadZone.style.borderColor = ''; });
-dubUploadZone.addEventListener('drop', e => {
-  e.preventDefault(); dubUploadZone.style.borderColor = '';
-  const f = e.dataTransfer.files[0];
-  if (f && (f.type.startsWith('video/') || f.name.match(/\.mp4$|\.mov$/i))) {
-    const dt = new DataTransfer(); dt.items.add(f); dubFileInput.files = dt.files;
-    dubFileInput.dispatchEvent(new Event('change'));
-  }
-});
-dubFileInput.addEventListener('change', () => {
-  const f = dubFileInput.files[0]; if (!f) return;
-  document.getElementById('dubFileName').textContent = '📎 ' + f.name;
-  dubUploadZone.classList.add('has-file');
-  document.getElementById('dubEmptyState').style.display = 'none';
-  dubPreviewVideo.style.display = 'block';
-  dubPreviewVideo.src = URL.createObjectURL(f);
-  dubPreviewVideo.addEventListener('loadedmetadata', () => {
-    if (captionBox) { document.getElementById('clearBtn').style.display = 'block'; drawOverlay(); }
-    if (document.getElementById('removeToggle').checked) { selCanvas.style.pointerEvents = 'auto'; selCanvas.style.cursor = 'crosshair'; }
-  }, { once: true });
-  updateTranslateBtn(); setTimeout(fitCanvas, 150); updateHint();
-});
-
-function fitCanvas() {
-  selCanvas.width = dubPhoneWrap.offsetWidth;
-  selCanvas.height = dubPhoneWrap.offsetHeight;
-  drawOverlay();
-}
-window.addEventListener('resize', fitCanvas);
-setTimeout(fitCanvas, 300);
-
-function onRemove() {
-  const on = document.getElementById('removeToggle').checked;
-  document.getElementById('removeCard').classList.toggle('active', on);
-  document.getElementById('removeCard').classList.toggle('on', on);
-  selCanvas.style.pointerEvents = on ? 'auto' : 'none';
-  selCanvas.style.cursor = on ? 'crosshair' : 'default';
-  updateHint();
-}
-function onAdd() {
-  const on = document.getElementById('addToggle').checked;
-  document.getElementById('addCard').classList.toggle('active', on);
-  document.getElementById('addCard').classList.toggle('on', on);
-  document.getElementById('stylePanel').style.display = on ? 'block' : 'none';
-  drawOverlay(); updateHint();
-}
-function updateHint() {
-  const rem = document.getElementById('removeToggle').checked;
-  const add = document.getElementById('addToggle').checked;
-  const h = document.getElementById('hintTxt');
-  if (!dubFileInput.files[0]) { h.textContent = 'Upload a video to preview'; return; }
-  if (rem && add) h.textContent = 'Draw box over captions · Preview shows translated caption position';
-  else if (rem) h.textContent = 'Draw a box over the captions you want removed';
-  else if (add) h.textContent = 'Preview shows where translated captions will appear';
-  else h.textContent = 'Enable an option to get started';
-}
-function onYPos() {
-  captionYPct = parseInt(document.getElementById('yPos').value);
-  document.getElementById('yposVal').textContent = captionYPct + '%';
-  drawOverlay(); savePreset();
-}
-function updateTranslateBtn() {
-  const lang = document.getElementById('langSelect').value;
-  const names = { none:'Process Video',es:'Spanish',hi:'Hindi',pt:'Portuguese',ja:'Japanese',fr:'French',pl:'Polish',it:'Italian',zh:'Chinese' };
-  document.getElementById('translateBtn').textContent = lang === 'none' ? '→ Process Video' : '→ Translate to ' + (names[lang] || lang);
-}
-
-// Canvas drawing
-selCanvas.addEventListener('mousedown', e => {
-  if (!document.getElementById('removeToggle').checked) return;
-  const r = selCanvas.getBoundingClientRect();
-  sx = e.clientX - r.left; sy = e.clientY - r.top;
-  isDrawing = true; captionBox = null;
-  document.getElementById('clearBtn').style.display = 'none';
-});
-selCanvas.addEventListener('mousemove', e => {
-  if (!isDrawing) return;
-  const r = selCanvas.getBoundingClientRect();
-  ctx.clearRect(0, 0, selCanvas.width, selCanvas.height);
-  drawBox(sx, sy, e.clientX - r.left - sx, e.clientY - r.top - sy);
-  if (document.getElementById('addToggle').checked) drawCaption();
-});
-selCanvas.addEventListener('mouseup', e => {
-  if (!isDrawing) return; isDrawing = false;
-  const r = selCanvas.getBoundingClientRect();
-  const bw = e.clientX - r.left - sx, bh = e.clientY - r.top - sy;
-  if (Math.abs(bw) > 6 && Math.abs(bh) > 6) {
-    captionBox = { x:Math.min(sx,sx+bw)/selCanvas.width, y:Math.min(sy,sy+bh)/selCanvas.height, w:Math.abs(bw)/selCanvas.width, h:Math.abs(bh)/selCanvas.height };
-    document.getElementById('clearBtn').style.display = 'block'; savePreset();
-  }
-  drawOverlay();
-});
-
-function drawBox(x,y,w,h) {
-  ctx.save();
-  ctx.strokeStyle='rgba(245,225,50,0.85)';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);
-  ctx.strokeRect(x,y,w,h);ctx.fillStyle='rgba(245,225,50,0.07)';ctx.fillRect(x,y,w,h);
-  ctx.restore();
-}
-function drawCaption() {
-  const W=selCanvas.width,H=selCanvas.height; if (!W||!H) return;
-  const fsp=parseFloat(document.getElementById('fontSize').value||4)/100;
-  const fs=Math.max(8,Math.round(H*fsp));
-  const ff=document.getElementById('fontFamily').value||'sans-serif';
-  const ts=document.getElementById('textStyle').value||'bold';
-  const tc=document.getElementById('textColor').value||'#fff';
-  const oc=document.getElementById('outlineColor').value||'#000';
-  const ow=parseFloat(document.getElementById('outlineWidth').value||15)/100;
-  const tcase=document.getElementById('textCase').value||'upper';
-  const hc=document.getElementById('highlightColor').value||'#f5e132';
-  const shadow=parseFloat(document.getElementById('shadowSize').value||0)/100;
-  const y=(captionYPct/100)*H;
-  ctx.save(); ctx.font=ts+' '+fs+'px '+ff; ctx.textAlign='center'; ctx.textBaseline='middle';
-  if (captionMode==='single') {
-    const txt=tcase==='lower'?'hola mundo':tcase==='normal'?'Hola Mundo':'HOLA MUNDO';
-    if (shadow>0){ctx.shadowColor='rgba(0,0,0,0.9)';ctx.shadowBlur=shadow*fs;ctx.shadowOffsetY=shadow*fs*0.3;}
-    if (ow>0){ctx.lineWidth=fs*ow;ctx.strokeStyle=oc;ctx.lineJoin='round';ctx.strokeText(txt,W/2,y);}
-    ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.fillStyle=tc;ctx.fillText(txt,W/2,y);
-  } else {
-    const words=tcase==='upper'?['HOLA','MUNDO','AMIGOS']:tcase==='lower'?['hola','mundo','amigos']:['Hola','Mundo','Amigos'];
-    let curX=W/2-words.reduce((a,ww)=>a+ctx.measureText(ww+' ').width,0)/2;
-    words.forEach((word,i)=>{
-      const ww=ctx.measureText(word+' ').width; const cx=curX+ww/2-ctx.measureText(' ').width/2;
-      const color=(captionMode==='highlight'&&i===1)?hc:tc;
-      if (shadow>0){ctx.shadowColor='rgba(0,0,0,0.9)';ctx.shadowBlur=shadow*fs;ctx.shadowOffsetY=shadow*fs*0.3;}
-      if (ow>0){ctx.lineWidth=fs*ow;ctx.strokeStyle=oc;ctx.lineJoin='round';ctx.strokeText(word,cx,y);}
-      ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.fillStyle=color;ctx.fillText(word,cx,y);curX+=ww;
-    });
-  }
-  ctx.restore();
-}
-function drawOverlay() {
-  ctx.clearRect(0,0,selCanvas.width,selCanvas.height);
-  if (captionBox&&document.getElementById('removeToggle').checked) drawBox(captionBox.x*selCanvas.width,captionBox.y*selCanvas.height,captionBox.w*selCanvas.width,captionBox.h*selCanvas.height);
-  if (document.getElementById('addToggle').checked) drawCaption();
-}
-function clearBox() { captionBox=null; document.getElementById('clearBtn').style.display='none'; drawOverlay(); savePreset(); }
-selCanvas.style.pointerEvents = 'none';
-
-// Dubbing progress
-const DUB_STEPS = [
-  { label:'Uploading video...', duration:15 },
-  { label:'Dubbing audio with ElevenLabs...', duration:120 },
-  { label:'Transcribing dubbed audio...', duration:20 },
-  { label:'Burning captions...', duration:60 },
-  { label:'Merging video...', duration:10 },
-];
-function startDubProg() {
-  clearInterval(dubProgInterval);
-  const hasRemoval = document.getElementById('removeToggle').checked && captionBox;
-  const hasCaptions = document.getElementById('addToggle').checked;
-  const steps = DUB_STEPS.filter((s,i) => {
-    if (i===2||i===3) return hasCaptions;
-    return true;
-  });
-  const totalMs = steps.reduce((a,s)=>a+s.duration*1000,0);
-  const start = Date.now();
-  document.getElementById('dubProgWrap').style.display = 'block';
-  document.getElementById('dubProgFill').style.width = '0%';
-  document.getElementById('dubProgPct').textContent = '0%';
-  document.getElementById('dubProgEta').textContent = 'Est. ~' + Math.ceil(totalMs/60000) + ' min';
-  dubProgInterval = setInterval(() => {
-    const elapsed = (Date.now()-start)/1000;
-    let cum=0, lbl=steps[steps.length-1].label;
-    for (const s of steps){cum+=s.duration;if(elapsed<cum){lbl=s.label;break;}}
-    const pct=Math.min(91,(elapsed/(totalMs/1000))*100);
-    document.getElementById('dubProgFill').style.width=pct.toFixed(1)+'%';
-    document.getElementById('dubProgPct').textContent=Math.round(pct)+'%';
-    document.getElementById('dubProgLbl').textContent=lbl;
-    const rem=Math.max(0,totalMs/1000-elapsed);
-    document.getElementById('dubProgEta').textContent=rem>5?'~'+Math.ceil(rem)+'s remaining':'Almost done...';
-  }, 500);
-}
-function finishDubProg() {
-  clearInterval(dubProgInterval);
-  document.getElementById('dubProgFill').style.width='100%';
-  document.getElementById('dubProgPct').textContent='100%';
-  document.getElementById('dubProgEta').textContent='Complete!';
-  setTimeout(()=>{document.getElementById('dubProgWrap').style.display='none';},1500);
-}
-
-function getStyle() {
-  return {
-    yPct:captionYPct, fontFamily:document.getElementById('fontFamily').value,
-    fontSize:parseFloat(document.getElementById('fontSize').value),
-    textColor:document.getElementById('textColor').value,
-    outlineColor:document.getElementById('outlineColor').value,
-    outlineWidth:parseFloat(document.getElementById('outlineWidth').value),
-    textStyle:document.getElementById('textStyle').value,
-    textCase:document.getElementById('textCase').value,
-    shadowSize:parseFloat(document.getElementById('shadowSize').value)/100,
-    captionMode:captionMode,
-    highlightColor:document.getElementById('highlightColor').value,
-    enabled:document.getElementById('addToggle').checked
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>{n.classList.remove('active');n.classList.remove('active-pur');});
+  document.getElementById('tab-'+tab).classList.add('active');
+  const nav = document.getElementById('nav-'+tab);
+  if(nav) nav.classList.add('active');
+  const titles={
+    aivg:['AI Video Gen','Image to video · Kie.ai powered'],
+    auto:['AI Automation','Niche video pipelines · fully automated'],
+    remover:['Caption Remover','AI-powered · EasyOCR + LaMa'],
   };
+  const t=titles[tab]||['DubShorts',''];
+  document.getElementById('topTitle').textContent=t[0];
+  document.getElementById('topTitle').className='pg-title';
+  document.getElementById('topSub').textContent=t[1];
+  const p=document.getElementById('topPill');
+  p.textContent='● Live';p.className='pill';
+}
+function soon(){alert('Coming soon!');}
+
+// ══ AUTOMATION NICHE ══
+const NICHES={
+  skeleton:{icon:'💀',name:'Skeleton',desc:'Dark, faceless skeleton character shorts. Best performing format for mystery and philosophy content. Character image import enabled for consistency across clips.',charUpload:true},
+  sora2:{icon:'🤖',name:'Sora 2',desc:'AI-generated cinematic scenes using Sora 2. No character reference needed — fully text-driven visual storytelling.',charUpload:false},
+  story:{icon:'📖',name:'Story (History)',desc:'Historical storytelling narration shorts. Archival imagery style with dramatic voice-over. No character reference needed.',charUpload:false},
+  ronaldo:{icon:'⚽',name:'Ronaldo Adventures',desc:'Fictional Ronaldo adventure story shorts. High-energy football montage style with AI generated scenes.',charUpload:false},
+  anim1:{icon:'🎬',name:'Animation 1',desc:'Animated character series — style A. Smooth anime-inspired motion with consistent character design across clips.',charUpload:true},
+  anim2:{icon:'🎭',name:'Animation 2',desc:'Animated character series — style B. Bold graphic novel aesthetic with high contrast colour grading.',charUpload:true},
+};
+let selectedNiche='skeleton';
+
+function selectNiche(el){
+  document.querySelectorAll('.niche-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedNiche=el.dataset.niche;
+  const n=NICHES[selectedNiche];
+  // Update preview card
+  document.getElementById('npName').textContent=n.icon+' '+n.name;
+  document.getElementById('npDesc').textContent=n.desc;
+  document.getElementById('nichePreview').classList.add('vis');
+  // Show/hide char upload
+  document.getElementById('charUploadSection').style.display=n.charUpload?'block':'none';
 }
 
-async function startTranslation() {
-  const f = dubFileInput.files[0]; if (!f) { alert('Please select a video'); return; }
-  const btn = document.getElementById('translateBtn');
-  btn.disabled = true; hide('dubDoneBox'); hide('dubErrBox');
-  startDubProg();
-  const fd = new FormData();
-  fd.append('video', f);
-  fd.append('language', document.getElementById('langSelect').value);
-  fd.append('captionStyle', JSON.stringify(getStyle()));
-  fd.append('addCaption', document.getElementById('addToggle').checked ? 'true' : 'false');
-  if (captionBox) fd.append('captionBox', JSON.stringify(captionBox));
-  if (document.getElementById('removeToggle').checked) fd.append('removeCaption', 'true');
-  try {
-    const res = await fetch('/dub-speakers', { method:'POST', body:fd });
-    const data = await res.json();
-    finishDubProg();
-    if (data.success) {
-      show('dubDoneBox');
-      document.getElementById('dubResultVideo').src = data.videoUrl;
-      document.getElementById('dubDlBtn').href = data.videoUrl;
-      document.getElementById('dubDoneTitle').textContent = data.cached ? '// DONE ✓ (cached)' : '// DONE ✓';
-    } else { show('dubErrBox'); document.getElementById('dubErrMsg').textContent = data.error; }
-  } catch(err) { finishDubProg(); show('dubErrBox'); document.getElementById('dubErrMsg').textContent = 'Could not reach the server.'; }
-  btn.disabled = false;
+function requestNiche(){
+  const name=prompt('What niche would you like to request?');
+  if(name&&name.trim()) alert('Request sent for "'+name.trim()+'" — we\'ll add it soon!');
 }
 
-// ══════════════════════════════════════════════
-// FONT PICKER
-// ══════════════════════════════════════════════
-const FONTS = [
-  {name:'Impact',family:'Impact'},{name:'Anton',family:'Anton'},{name:'Bebas Neue',family:'BebasNeue'},
-  {name:'Oswald Bold',family:'Oswald'},{name:'Barlow Condensed',family:'BarlowCondensed'},
-  {name:'Fjalla One',family:'FjallaOne'},{name:'Roboto Bold',family:'Roboto'},
-  {name:'Poppins Bold',family:'Poppins'},{name:'Lato Bold',family:'Lato'},
-  {name:'Ubuntu Bold',family:'Ubuntu'},{name:'Bangers',family:'Bangers'},
-  {name:'Pacifico',family:'Pacifico'},{name:'Permanent Marker',family:'PermanentMarker'},
-  {name:'Righteous',family:'Righteous'},{name:'Montserrat Bold',family:'Montserrat'},
-  {name:'DejaVu Bold',family:'CaptionFont'}
+// ══ CHAR IMAGE UPLOAD ══
+const charDrop=document.getElementById('charDrop'),charInput=document.getElementById('charInput');
+charDrop.addEventListener('dragover',e=>{e.preventDefault();charDrop.style.borderColor='var(--y)';});
+charDrop.addEventListener('dragleave',()=>charDrop.style.borderColor='');
+charDrop.addEventListener('drop',e=>{
+  e.preventDefault();charDrop.style.borderColor='';
+  const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/')){const dt=new DataTransfer();dt.items.add(f);charInput.files=dt.files;loadChar(f);}
+});
+charInput.addEventListener('change',()=>{if(charInput.files[0])loadChar(charInput.files[0]);});
+
+function loadChar(f){
+  document.getElementById('charFnm').textContent='📎 '+f.name;
+  charDrop.classList.add('has-char');
+  const img=document.getElementById('charPreviewImg');
+  img.src=URL.createObjectURL(f);img.style.display='block';
+  document.getElementById('charPreviewWrap').style.display='block';
+  document.getElementById('charIco').style.display='none';
+  document.getElementById('charTtl').style.display='none';
+}
+
+// ══ AUTOMATION SUBMIT ══
+async function submitAutomation(){
+  const yt=document.getElementById('ytLink').value.trim();
+  const script=document.getElementById('autoScript').value.trim();
+  if(!script){alert('Please paste a script first.');return;}
+  const n=NICHES[selectedNiche];
+  if(n.charUpload&&!charInput.files[0]){alert('Please upload a character reference image for the '+n.name+' niche.');return;}
+
+  const btn=document.getElementById('autoSubmitBtn');
+  btn.disabled=true;btn.textContent='⏳ Submitting...';
+  hide('autoErr');
+
+  const fd=new FormData();
+  fd.append('niche',selectedNiche);
+  fd.append('script',script);
+  if(yt)fd.append('ytLink',yt);
+  if(n.charUpload&&charInput.files[0])fd.append('charImage',charInput.files[0]);
+
+  try{
+    const res=await fetch('/automation-job',{method:'POST',body:fd});
+    const data=await res.json();
+    if(data.success){alert('✓ Job submitted! You\'ll receive your video at '+data.estimatedTime+'.');}
+    else{show('autoErr');document.getElementById('autoErrMsg').textContent=data.error||'Submission failed.';}
+  }catch(e){
+    show('autoErr');document.getElementById('autoErrMsg').textContent='Could not reach server: '+e.message;
+  }
+  btn.disabled=false;btn.textContent='⚡ Submit Automation Job';
+}
+
+// ══ IMAGE UPLOAD ══
+const imgDrop=document.getElementById('imgDrop'),imgInput=document.getElementById('imgInput'),imgPrev=document.getElementById('imgPrev');
+imgDrop.addEventListener('dragover',e=>{e.preventDefault();imgDrop.classList.add('drag');});
+imgDrop.addEventListener('dragleave',()=>imgDrop.classList.remove('drag'));
+imgDrop.addEventListener('drop',e=>{e.preventDefault();imgDrop.classList.remove('drag');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/')){const dt=new DataTransfer();dt.items.add(f);imgInput.files=dt.files;loadImg(f);}});
+imgInput.addEventListener('change',()=>{if(imgInput.files[0])loadImg(imgInput.files[0]);});
+
+function loadImg(f){
+  document.getElementById('imgFnm').textContent='📎 '+f.name;
+  imgDrop.classList.add('has');
+  imgPrev.src=URL.createObjectURL(f);imgPrev.style.display='block';
+  imgDrop.querySelectorAll('.ico,.ttl,.hnt').forEach(el=>el.style.display='none');
+  document.getElementById('phEmpty').style.display='none';
+}
+
+// ══ CHIP SELECT ══
+function selChip(el,group){
+  el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+}
+
+// ══ AUDIO ══
+function onAudio(){
+  const on=document.getElementById('audioTog').checked;
+  document.getElementById('audioLbl').textContent=on?'On':'Off';
+  calcCredits();
+}
+
+// ══ CREDITS ══
+// $5 = 1000 credits → $0.005/credit
+const CR_VAL=0.005;
+// Audio adds ~50% cost on Kling models
+const AUDIO_EXTRA={'kling3-720p':6,'kling3-1080p':9,'kling2.5t-5s':21,'kling2.5t-10s':42};
+
+function calcCredits(){
+  const sel=document.getElementById('modelSel');
+  const opt=sel.options[sel.selectedIndex];
+  let cr=parseInt(opt.dataset.cr)||60;
+  const audioOn=document.getElementById('audioTog').checked;
+  if(audioOn&&AUDIO_EXTRA[sel.value])cr+=AUDIO_EXTRA[sel.value];
+  const usd=(cr*CR_VAL).toFixed(2);
+  document.getElementById('crBadge').textContent=cr+' cr';
+  document.getElementById('crUsd').textContent='$'+usd;
+}
+
+// ══ GENERATION ══
+const STEPS=[
+  {l:'Queuing job...',s:'⬡ Queuing',d:3},
+  {l:'Uploading image...',s:'⬡ Uploading',d:5},
+  {l:'Generating keyframes...',s:'⬡ Keyframes',d:20},
+  {l:'Rendering video...',s:'⬡ Rendering',d:35},
+  {l:'Encoding output...',s:'⬡ Encoding',d:7},
 ];
-function renderFontList(fonts) {
-  document.getElementById('fontList').innerHTML = fonts.map(f =>
-    `<div onclick="selectFont('${f.family}','${f.name}')" style="padding:6px 9px;font-size:11px;cursor:pointer;color:var(--tx);" onmouseover="this.style.background='var(--s4)'" onmouseout="this.style.background=''"> ${f.name}</div>`
-  ).join('');
-}
-function filterFonts(q) { document.getElementById('fontList').style.display='block'; renderFontList(FONTS.filter(f=>f.name.toLowerCase().includes(q.toLowerCase()))); }
-function selectFont(family,name) {
-  document.getElementById('fontFamily').value=family;
-  document.getElementById('fontSelected').textContent='✓ '+name;
-  document.getElementById('fontSearch').value=name;
-  document.getElementById('fontList').style.display='none';
-  savePreset();
-  document.fonts.load('bold 40px '+family).then(()=>drawOverlay()).catch(()=>drawOverlay());
-}
-document.addEventListener('click', e => { if (!e.target.closest('.sfi')) document.getElementById('fontList').style.display='none'; });
-renderFontList(FONTS);
+let genTick=null;
 
-// ══════════════════════════════════════════════
-// STYLE PANEL TOGGLE
-// ══════════════════════════════════════════════
-function toggleStylePanel() {
-  const inner = document.getElementById('styleInner');
-  const arrow = document.getElementById('styleArrow');
-  const collapsed = inner.style.display === 'none';
-  inner.style.display = collapsed ? 'block' : 'none';
-  arrow.textContent = collapsed ? '▼' : '▶';
-  savePreset();
-}
+function startGen(){
+  const f=imgInput.files[0];
+  if(!f){alert('Please upload a reference image first.');return;}
+  const btn=document.getElementById('genBtn');
+  btn.disabled=true;
+  document.getElementById('resultBtns').classList.remove('vis');
+  document.getElementById('aivgErr').style.display='none';
+  document.getElementById('phVideo').style.display='none';
 
-// ══════════════════════════════════════════════
-// CAPTION MODE
-// ══════════════════════════════════════════════
-function setMode(mode) {
-  captionMode = mode;
-  ['single','multi','highlight'].forEach(m => {
-    const el = document.getElementById('mode'+m.charAt(0).toUpperCase()+m.slice(1));
-    if (el) el.classList.toggle('active', m===mode);
-  });
-  document.getElementById('hlColorRow').style.display = mode==='highlight' ? 'flex' : 'none';
-  drawOverlay();
-}
+  clearInterval(genTick);
+  const prog=document.getElementById('genProg');prog.classList.add('vis');
+  document.getElementById('gpFill').style.width='0%';
+  document.getElementById('gpPct').textContent='0%';
+  const total=STEPS.reduce((a,s)=>a+s.d,0),t0=Date.now();
+  genTick=setInterval(()=>{
+    const el=(Date.now()-t0)/1000;
+    let cum=0,lbl=STEPS[STEPS.length-1].l,stp=STEPS[STEPS.length-1].s;
+    for(const s of STEPS){cum+=s.d;if(el<cum){lbl=s.l;stp=s.s;break;}}
+    const pct=Math.min(92,(el/total)*100);
+    document.getElementById('gpFill').style.width=pct.toFixed(1)+'%';
+    document.getElementById('gpPct').textContent=Math.round(pct)+'%';
+    document.getElementById('gpLbl').textContent=lbl;
+    document.getElementById('gpStep').textContent=stp;
+  },400);
 
-// ══════════════════════════════════════════════
-// PRESET
-// ══════════════════════════════════════════════
-function savePreset() {
-  try {
-    localStorage.setItem('dubshorts_preset', JSON.stringify({
-      yPct:captionYPct, fontFamily:document.getElementById('fontFamily').value,
-      fontSearch:document.getElementById('fontSearch').value, fontSelectedText:document.getElementById('fontSelected').textContent,
-      fontSize:document.getElementById('fontSize').value, textStyle:document.getElementById('textStyle').value,
-      textCase:document.getElementById('textCase').value, textColor:document.getElementById('textColor').value,
-      outlineColor:document.getElementById('outlineColor').value, outlineWidth:document.getElementById('outlineWidth').value,
-      shadowSize:document.getElementById('shadowSize').value, captionMode, highlightColor:document.getElementById('highlightColor').value,
-      language:document.getElementById('langSelect').value,
-      removeCaption:document.getElementById('removeToggle').checked, addCaption:document.getElementById('addToggle').checked,
-      captionBox, stylePanelOpen:document.getElementById('styleInner').style.display!=='none'
-    }));
-  } catch(e) {}
-}
-function loadPreset() {
-  try {
-    const p = JSON.parse(localStorage.getItem('dubshorts_preset')); if (!p) return;
-    if (p.yPct!==undefined){captionYPct=p.yPct;document.getElementById('yPos').value=p.yPct;document.getElementById('yposVal').textContent=p.yPct+'%';}
-    if (p.fontFamily) document.getElementById('fontFamily').value=p.fontFamily;
-    if (p.fontSearch) document.getElementById('fontSearch').value=p.fontSearch;
-    if (p.fontSelectedText) document.getElementById('fontSelected').textContent=p.fontSelectedText;
-    if (p.fontSize){document.getElementById('fontSize').value=p.fontSize;document.getElementById('sizeVal').textContent=p.fontSize+'%';}
-    if (p.textStyle) document.getElementById('textStyle').value=p.textStyle;
-    if (p.textCase) document.getElementById('textCase').value=p.textCase;
-    if (p.textColor) document.getElementById('textColor').value=p.textColor;
-    if (p.outlineColor) document.getElementById('outlineColor').value=p.outlineColor;
-    if (p.outlineWidth){document.getElementById('outlineWidth').value=p.outlineWidth;document.getElementById('outlineVal').textContent=p.outlineWidth+'%';}
-    if (p.shadowSize){document.getElementById('shadowSize').value=p.shadowSize;document.getElementById('shadowVal').textContent=p.shadowSize+'%';}
-    if (p.captionMode) setMode(p.captionMode);
-    if (p.highlightColor) document.getElementById('highlightColor').value=p.highlightColor;
-    if (p.language){document.getElementById('langSelect').value=p.language;updateTranslateBtn();}
-    if (p.removeCaption){document.getElementById('removeToggle').checked=true;onRemove();}
-    if (p.addCaption){document.getElementById('addToggle').checked=true;onAdd();}
-    if (p.captionBox){captionBox=p.captionBox;document.getElementById('clearBtn').style.display='block';drawOverlay();}
-    if (p.stylePanelOpen===false){document.getElementById('styleInner').style.display='none';document.getElementById('styleArrow').textContent='▶';}
-  } catch(e) {}
+  const fd=new FormData();
+  fd.append('image',f);
+  const prompt=document.getElementById('aivgPrompt').value.trim();
+  if(prompt)fd.append('prompt',prompt);
+  fd.append('model',document.getElementById('modelSel').value);
+  fd.append('audio',document.getElementById('audioTog').checked?'true':'false');
+  fd.append('duration',document.querySelector('#durChips .chip.on')?.textContent||'5s');
+  fd.append('resolution',document.querySelector('#resChips .chip.on')?.textContent||'720p');
+
+  fetch('/generate-video',{method:'POST',body:fd})
+    .then(r=>r.json())
+    .then(data=>{
+      clearInterval(genTick);
+      document.getElementById('gpFill').style.width='100%';
+      document.getElementById('gpPct').textContent='100%';
+      document.getElementById('gpLbl').textContent='Done!';
+      document.getElementById('gpStep').textContent='✓ Complete';
+      setTimeout(()=>prog.classList.remove('vis'),1500);
+      if(data.success){
+        const v=document.getElementById('phVideo');v.src=data.videoUrl;v.style.display='block';
+        document.getElementById('prevLbl').textContent='RESULT ✓';
+        document.getElementById('dlBtn').href=data.videoUrl;
+        document.getElementById('resultBtns').classList.add('vis');
+      }else{
+        document.getElementById('aivgErr').style.display='block';
+        document.getElementById('aivgErrMsg').textContent=data.error||'Generation failed.';
+      }
+    })
+    .catch(err=>{
+      clearInterval(genTick);prog.classList.remove('vis');
+      document.getElementById('aivgErr').style.display='block';
+      document.getElementById('aivgErrMsg').textContent='Could not reach server: '+err.message;
+    })
+    .finally(()=>{btn.disabled=false;});
 }
 
-// ══════════════════════════════════════════════
-// UTILS
-// ══════════════════════════════════════════════
+// ══ CAPTION REMOVER ══
+const remInput=document.getElementById('remInput'),remZone=document.getElementById('remZone'),remVid=document.getElementById('remVid');
+remZone.addEventListener('click',()=>remInput.click());
+remZone.addEventListener('dragover',e=>{e.preventDefault();remZone.classList.add('drag');});
+remZone.addEventListener('dragleave',()=>remZone.classList.remove('drag'));
+remZone.addEventListener('drop',e=>{e.preventDefault();remZone.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)loadRem(f);});
+remInput.addEventListener('change',()=>{if(remInput.files[0])loadRem(remInput.files[0]);});
+
+function loadRem(f){
+  document.getElementById('remFnm').textContent='📎 '+f.name;
+  remZone.classList.add('has-file');
+  document.getElementById('remEmpty').style.display='none';
+  remVid.style.display='block';remVid.src=URL.createObjectURL(f);
+  document.getElementById('remBtn').disabled=false;
+  document.getElementById('remPrevLbl').textContent='ORIGINAL';
+  hide('remDone');hide('remErr');
+}
+
+async function startRemoval(){
+  const f=remInput.files[0];if(!f){alert('Please select a video first');return;}
+  const btn=document.getElementById('remBtn');btn.disabled=true;
+  hide('remDone');hide('remErr');startRemProg();
+  const fd=new FormData();fd.append('video',f);
+  try{
+    const res=await fetch('/remove-captions',{method:'POST',body:fd});
+    const data=await res.json();finishRemProg();
+    if(data.success){show('remDone');document.getElementById('remDlBtn').href=data.videoUrl;remVid.src=data.videoUrl;document.getElementById('remPrevLbl').textContent='RESULT — CAPTIONS REMOVED ✓';}
+    else{show('remErr');document.getElementById('remErrMsg').textContent=data.error;}
+  }catch(e){finishRemProg();show('remErr');document.getElementById('remErrMsg').textContent='Server error: '+e.message;}
+  btn.disabled=false;
+}
+
+const REM=[{l:'Loading AI models...',d:15},{l:'Extracting frames...',d:20},{l:'Detecting captions (EasyOCR)...',d:35},{l:'Inpainting with LaMa AI...',d:120},{l:'Reassembling video...',d:20}];
+let remTick=null;
+function startRemProg(){
+  clearInterval(remTick);
+  document.getElementById('remProgWrap').style.display='block';
+  document.getElementById('remProgFill').style.width='0%';
+  document.getElementById('remProgPct').textContent='0%';
+  const total=REM.reduce((a,s)=>a+s.d*1000,0),t0=Date.now();
+  remTick=setInterval(()=>{
+    const el=(Date.now()-t0)/1000;let cum=0,lbl=REM[REM.length-1].l;
+    for(const s of REM){cum+=s.d;if(el<cum){lbl=s.l;break;}}
+    const pct=Math.min(93,(el/(total/1000))*100);
+    document.getElementById('remProgFill').style.width=pct.toFixed(1)+'%';
+    document.getElementById('remProgPct').textContent=Math.round(pct)+'%';
+    document.getElementById('remProgLbl').textContent=lbl;
+    const rem=Math.max(0,total/1000-el);
+    document.getElementById('remProgEta').textContent=rem>5?'~'+Math.ceil(rem)+'s remaining':'Almost done...';
+  },400);
+}
+function finishRemProg(){
+  clearInterval(remTick);
+  document.getElementById('remProgFill').style.width='100%';
+  document.getElementById('remProgPct').textContent='100%';
+  document.getElementById('remProgLbl').textContent='Done!';
+  document.getElementById('remProgEta').textContent='Complete!';
+  setTimeout(()=>{document.getElementById('remProgWrap').style.display='none';},1500);
+}
+
 function show(id){document.getElementById(id).style.display='block';}
 function hide(id){document.getElementById(id).style.display='none';}
 
-// ══════════════════════════════════════════════
-// INIT
-// ══════════════════════════════════════════════
-loadPreset();
-updateHint();
-updateTranslateBtn();
-const _sp = localStorage.getItem('dubshorts_preset');
-const _sf = _sp ? JSON.parse(_sp).fontFamily : null;
-const _sn = _sp ? JSON.parse(_sp).fontSearch : null;
-if (_sf && _sn) selectFont(_sf, _sn); else selectFont('Impact','Impact');
+// Init
+calcCredits();
+// Automation: show char upload for default niche
+document.getElementById('charUploadSection').style.display='block';
 </script>
 </body>
 </html>
