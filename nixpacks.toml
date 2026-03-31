@@ -1,8 +1,4 @@
 [phases.setup]
 nixPkgs = ["nodejs", "ffmpeg"]
-
-[phases.install]
-cmds = ["cd caption-remover && npm install"]
-
 [start]
-cmd = "node caption-remover/server.js"
+cmd = "node server.js"
